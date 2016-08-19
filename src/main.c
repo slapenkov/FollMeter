@@ -1,5 +1,5 @@
 #include "stm32f0xx.h"
-//#include "uc1601s.h"
+#include "uc1601s.h"
 #include "tools.h"
 
 uint8_t i = 0;
@@ -17,19 +17,7 @@ int main(void) {
   TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
   TIM_Cmd(TIM2, ENABLE);
 
-//  LCD_init();
-  //Init reset pin (PC0) and BL pin
-  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);
-  GPIO_InitTypeDef gpio_port;
-  gpio_port.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
-  gpio_port.GPIO_Mode = GPIO_Mode_OUT;
-  gpio_port.GPIO_OType = GPIO_OType_PP;
-  gpio_port.GPIO_Speed = GPIO_Speed_10MHz;
-  GPIO_Init(GPIOB, &gpio_port);
-  GPIO_ResetBits(GPIOB, GPIO_Pin_5 );
-  GPIO_WriteBit(GPIOB, GPIO_Pin_4, Bit_SET);
-
-  GPIO_WriteBit(GPIOB, GPIO_Pin_5, Bit_SET); // Unreset
+  LCD_init();
 
   //Enable TIM2 IRQ
   NVIC_InitTypeDef NVIC_InitStructure;
