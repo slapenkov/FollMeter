@@ -4,6 +4,7 @@
 
 uint8_t i = 0;
 
+
 int main(void) {
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE); // Enable TIM2 Periph clock
 
@@ -19,6 +20,10 @@ int main(void) {
 
   LCD_init();
 
+  //debug
+  LCD_string("10x15", 0, 0, FONT_TYPE_10x15, INVERSE_TYPE_NOINVERSE);
+
+
   //Enable TIM2 IRQ
   NVIC_InitTypeDef NVIC_InitStructure;
   NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;
@@ -33,7 +38,7 @@ void TIM2_IRQHandler(void) {
   TIM_ClearITPendingBit(TIM2, TIM_SR_UIF );
 
   // Some LCD demonstrations
-  /*LCD_clear(0);
+ LCD_clear(0);
   switch (i++ % 7) {
     case 0:
       LCD_string("10x15", 0, 0, FONT_TYPE_10x15, INVERSE_TYPE_NOINVERSE);
@@ -71,6 +76,6 @@ void TIM2_IRQHandler(void) {
       }
       break;
     }
-  }*/
+  }
 }
 

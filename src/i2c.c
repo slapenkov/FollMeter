@@ -43,7 +43,7 @@ void I2C_LowLevel_Init(void) {
 	GPIO_PinAFConfig(GPIOB, GPIO_PinSource7, GPIO_AF_1);
 
 	//Configure and Initialize the I2C
-	I2C_InitStructure.I2C_Timing = 0x00700A5E; //timing for 400kHz on 48MHz system clock
+	I2C_InitStructure.I2C_Timing = 0x00201D2B;
 	I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
 	I2C_InitStructure.I2C_OwnAddress1 = 0x00; //We are the master. We don't need this
 	I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
@@ -118,8 +118,8 @@ uint32_t I2C_WrBuf(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
 	//I2C_GenerateSTOP(I2Cx, ENABLE);
 
 	//Wait to be sure that line is idle
-	while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY))
-		;
+	/*while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY))
+		;*/
 
 	return 0;
 }
@@ -173,100 +173,100 @@ uint32_t I2C_RdBuf(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
  * @return
  */
 /*uint32_t I2C_RdBufEasy(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
-	//Generate Start
-	I2C_Start();
+ //Generate Start
+ I2C_Start();
 
-	//Send I2C Device Address
-	I2C_Addr(DevAddr, I2C_Direction_Receiver);
+ //Send I2C Device Address
+ I2C_Addr(DevAddr, I2C_Direction_Receiver);
 
-	if (cnt == 1) {  //We are going to read only 1 byte
-		//Before Clearing Addr bit by reading SR2, we have to cancel ack.
-		I2Cx->CR1 &= (uint16_t) ~((uint16_t) I2C_CR1_ACK);
+ if (cnt == 1) {  //We are going to read only 1 byte
+ //Before Clearing Addr bit by reading SR2, we have to cancel ack.
+ I2Cx->CR1 &= (uint16_t) ~((uint16_t) I2C_CR1_ACK);
 
-		//Now Read the SR2 to clear ADDR
-		(void) I2Cx->SR2;
+ //Now Read the SR2 to clear ADDR
+ (void) I2Cx->SR2;
 
-		//Order a STOP condition
-		//Note: Spec_p583 says this should be done just after clearing ADDR
-		//If it is done before ADDR is set, a STOP is generated immediately as the clock is being streched
-		I2Cx->CR1 |= I2C_CR1_STOP;
-		//Be carefull that till the stop condition is actually transmitted the clock will stay active even if a NACK is generated after the next received byte.
+ //Order a STOP condition
+ //Note: Spec_p583 says this should be done just after clearing ADDR
+ //If it is done before ADDR is set, a STOP is generated immediately as the clock is being streched
+ I2Cx->CR1 |= I2C_CR1_STOP;
+ //Be carefull that till the stop condition is actually transmitted the clock will stay active even if a NACK is generated after the next received byte.
 
-		//Read the next byte
-		I2C_Read(buf);
+ //Read the next byte
+ I2C_Read(buf);
 
-		//Make Sure Stop bit is cleared and Line is now Iddle
-		WaitLineIdle();
+ //Make Sure Stop bit is cleared and Line is now Iddle
+ WaitLineIdle();
 
-		//Enable the Acknowledgement again
-		I2Cx->CR1 |= ((uint16_t) I2C_CR1_ACK);
-	}
+ //Enable the Acknowledgement again
+ I2Cx->CR1 |= ((uint16_t) I2C_CR1_ACK);
+ }
 
-	else if (cnt == 2) {  //We are going to read 2 bytes (See: Spec_p584)
-		//Before Clearing Addr, reset ACK, set POS
-		I2Cx->CR1 &= (uint16_t) ~((uint16_t) I2C_CR1_ACK);
-		I2Cx->CR1 |= I2C_CR1_POS;
+ else if (cnt == 2) {  //We are going to read 2 bytes (See: Spec_p584)
+ //Before Clearing Addr, reset ACK, set POS
+ I2Cx->CR1 &= (uint16_t) ~((uint16_t) I2C_CR1_ACK);
+ I2Cx->CR1 |= I2C_CR1_POS;
 
-		//Read the SR2 to clear ADDR
-		(void) I2Cx->SR2;
+ //Read the SR2 to clear ADDR
+ (void) I2Cx->SR2;
 
-		//Wait for the next 2 bytes to be received (1st in the DR, 2nd in the shift register)
-		WaitSR1FlagsSet(I2C_SR1_BTF);
-		//As we don't read anything from the DR, the clock is now being strecthed.
+ //Wait for the next 2 bytes to be received (1st in the DR, 2nd in the shift register)
+ WaitSR1FlagsSet(I2C_SR1_BTF);
+ //As we don't read anything from the DR, the clock is now being strecthed.
 
-		//Order a stop condition (as the clock is being strecthed, the stop condition is generated immediately)
-		I2Cx->CR1 |= I2C_CR1_STOP;
+ //Order a stop condition (as the clock is being strecthed, the stop condition is generated immediately)
+ I2Cx->CR1 |= I2C_CR1_STOP;
 
-		//Read the next two bytes
-		I2C_Read(buf++);
-		I2C_Read(buf);
+ //Read the next two bytes
+ I2C_Read(buf++);
+ I2C_Read(buf);
 
-		//Make Sure Stop bit is cleared and Line is now Iddle
-		WaitLineIdle();
+ //Make Sure Stop bit is cleared and Line is now Iddle
+ WaitLineIdle();
 
-		//Enable the ack and reset Pos
-		I2Cx->CR1 |= ((uint16_t) I2C_CR1_ACK);
-		I2Cx->CR1 &= (uint16_t) ~((uint16_t) I2C_CR1_POS);
-	} else { //We have more than 2 bytes. See spec_p585
-		//Read the SR2 to clear ADDR
-		(void) I2Cx->SR2;
+ //Enable the ack and reset Pos
+ I2Cx->CR1 |= ((uint16_t) I2C_CR1_ACK);
+ I2Cx->CR1 &= (uint16_t) ~((uint16_t) I2C_CR1_POS);
+ } else { //We have more than 2 bytes. See spec_p585
+ //Read the SR2 to clear ADDR
+ (void) I2Cx->SR2;
 
-		while ((cnt--) > 3) {    //Read till the last 3 bytes
-			I2C_Read(buf++);
-		}
+ while ((cnt--) > 3) {    //Read till the last 3 bytes
+ I2C_Read(buf++);
+ }
 
-		//3 more bytes to read. Wait till the next to is actually received
-		WaitSR1FlagsSet(I2C_SR1_BTF);
-		//Here the clock is strecthed. One more to read.
+ //3 more bytes to read. Wait till the next to is actually received
+ WaitSR1FlagsSet(I2C_SR1_BTF);
+ //Here the clock is strecthed. One more to read.
 
-		//Reset Ack
-		I2Cx->CR1 &= (uint16_t) ~((uint16_t) I2C_CR1_ACK);
+ //Reset Ack
+ I2Cx->CR1 &= (uint16_t) ~((uint16_t) I2C_CR1_ACK);
 
-		//Read N-2
-		I2C_Read(buf++);
-		//Once we read this, N is going to be read to the shift register and NACK is generated
+ //Read N-2
+ I2C_Read(buf++);
+ //Once we read this, N is going to be read to the shift register and NACK is generated
 
-		//Wait for the BTF
-		WaitSR1FlagsSet(I2C_SR1_BTF); //N-1 is in DR, N is in shift register
-		//Here the clock is stretched
+ //Wait for the BTF
+ WaitSR1FlagsSet(I2C_SR1_BTF); //N-1 is in DR, N is in shift register
+ //Here the clock is stretched
 
-		//Generate a stop condition
-		I2Cx->CR1 |= I2C_CR1_STOP;
+ //Generate a stop condition
+ I2Cx->CR1 |= I2C_CR1_STOP;
 
-		//Read the last two bytes (N-1 and N)
-		//Read the next two bytes
-		I2C_Read(buf++);
-		I2C_Read(buf);
+ //Read the last two bytes (N-1 and N)
+ //Read the next two bytes
+ I2C_Read(buf++);
+ I2C_Read(buf);
 
-		//Make Sure Stop bit is cleared and Line is now Iddle
-		WaitLineIdle();
+ //Make Sure Stop bit is cleared and Line is now Iddle
+ WaitLineIdle();
 
-		//Enable the ack
-		I2Cx->CR1 |= ((uint16_t) I2C_CR1_ACK);
-	}
+ //Enable the ack
+ I2Cx->CR1 |= ((uint16_t) I2C_CR1_ACK);
+ }
 
-	return 0;
-}*/
+ return 0;
+ }*/
 
 ///////////////PRIVATE FUNCTIONS/////////////////////
 static uint32_t I2C_Read(uint8_t *pBuf) {
@@ -283,102 +283,102 @@ static uint32_t I2C_Read(uint8_t *pBuf) {
 
 static uint32_t I2C_Write(uint8_t byte) {
 
+	//Wait till the content of DR is transferred to the shift Register.
+	while (!((I2Cx->ISR) & (I2C_FLAG_TXE))) {
+	};
+
 	//Write the byte to the DR
 	I2C_SendData(I2Cx, byte);
 
-	//Wait till the content of DR is transferred to the shift Register.
-	while (!I2C_GetFlagStatus(I2Cx, I2C_FLAG_TXIS))
-		;
 	return 0;
 
 }
 
 /*static uint32_t I2C_Addr(uint8_t DevAddr, uint8_t dir) {
 
-	//Write address to the DR (to the bus)
-	I2Cx->DR = DevAddr | dir;
+ //Write address to the DR (to the bus)
+ I2Cx->DR = DevAddr | dir;
 
-	//Wait till ADDR is set (ADDR is set when the slave sends ACK to the address).
-	//Clock streches till ADDR is Reset. To reset the hardware i)Read the SR1 ii)Wait till ADDR is Set iii)Read SR2
-	//Note1:Spec_p602 recommends the waiting operation
-	//Note2:We don't read SR2 here. Therefore the clock is going to be streched even after return from this function
-	return WaitSR1FlagsSet(I2C_SR1_ADDR);
+ //Wait till ADDR is set (ADDR is set when the slave sends ACK to the address).
+ //Clock streches till ADDR is Reset. To reset the hardware i)Read the SR1 ii)Wait till ADDR is Set iii)Read SR2
+ //Note1:Spec_p602 recommends the waiting operation
+ //Note2:We don't read SR2 here. Therefore the clock is going to be streched even after return from this function
+ return WaitSR1FlagsSet(I2C_SR1_ADDR);
 
 
-	 //Send DevAddr
-	 I2C_Send7bitAddress(I2Cx, DevAddr, dir);  //This Clears EV5 (SR1 was read before).
+ //Send DevAddr
+ I2C_Send7bitAddress(I2Cx, DevAddr, dir);  //This Clears EV5 (SR1 was read before).
 
-	 //Check EV6 and clear it (Reading SR1 and SR2 clears it) (Strectes the clock till cleared)
-	 if (dir==I2C_Direction_Transmitter) {
-	 return WaitEvent(I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
-	 }
-	 else {  //I2C_Direction_Receiver
-	 return WaitEvent(I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);
-	 }
+ //Check EV6 and clear it (Reading SR1 and SR2 clears it) (Strectes the clock till cleared)
+ if (dir==I2C_Direction_Transmitter) {
+ return WaitEvent(I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
+ }
+ else {  //I2C_Direction_Receiver
+ return WaitEvent(I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);
+ }
 
-}
-*/
+ }
+ */
 /*static uint32_t I2C_Start(void) {
 
-	//Generate a start condition. (As soon as the line becomes idle, a Start condition will be generated)
-	I2Cx->CR1 |= I2C_CR1_START;
+ //Generate a start condition. (As soon as the line becomes idle, a Start condition will be generated)
+ I2Cx->CR1 |= I2C_CR1_START;
 
-	//When start condition is generated SB is set and clock is stretched.
-	//To activate the clock again i)read SR1 ii)write something to DR (e.g. address)
-	return WaitSR1FlagsSet(I2C_SR1_SB);  //Wait till SB is set
+ //When start condition is generated SB is set and clock is stretched.
+ //To activate the clock again i)read SR1 ii)write something to DR (e.g. address)
+ return WaitSR1FlagsSet(I2C_SR1_SB);  //Wait till SB is set
 
-	 //Generate Start Condition
-	 I2C_GenerateSTART(I2Cx, ENABLE);
+ //Generate Start Condition
+ I2C_GenerateSTART(I2Cx, ENABLE);
 
-	 //Check EV5 (SB bit will be cleared after SR1 read and DR write.)
-	 return WaitEvent(I2C_EVENT_MASTER_MODE_SELECT);
-	 //Note: Ev5 Strectes the CLK till it is cleared.
-}
-*/
+ //Check EV5 (SB bit will be cleared after SR1 read and DR write.)
+ return WaitEvent(I2C_EVENT_MASTER_MODE_SELECT);
+ //Note: Ev5 Strectes the CLK till it is cleared.
+ }
+ */
 
 /*static uint32_t WaitSR1FlagsSet(uint32_t Flags) {
-	//Wait till the specified SR1 Bits are set
-	//More than 1 Flag can be "or"ed. This routine reads only SR1.
-	uint32_t TimeOut = HSI_VALUE;
+ //Wait till the specified SR1 Bits are set
+ //More than 1 Flag can be "or"ed. This routine reads only SR1.
+ uint32_t TimeOut = HSI_VALUE;
 
-	while (((I2Cx->SR1) & Flags) != Flags) {
-		if (!(TimeOut--)) {
-			while (1)
-				; //
-			// panic(Flags, "I2C Error\n");
-			return 1;
-		}
-	}
-	return 0;
-}*/
+ while (((I2Cx->SR1) & Flags) != Flags) {
+ if (!(TimeOut--)) {
+ while (1)
+ ; //
+ // panic(Flags, "I2C Error\n");
+ return 1;
+ }
+ }
+ return 0;
+ }*/
 
 /*static uint32_t WaitLineIdle(void) {
-	//Wait till the Line becomes idle.
+ //Wait till the Line becomes idle.
 
-	uint32_t TimeOut = HSI_VALUE;
-	//Check to see if the Line is busy
-	//This bit is set automatically when a start condition is broadcasted on the line (even from another master)
-	//and is reset when stop condition is detected.
-	while ((I2Cx->SR2) & (I2C_SR2_BUSY)) {
-		if (!(TimeOut--)) {
-			// panic(0, "I2C Error\n");
-			while (1)
-				; //
-			return 1;
-		}
-	}
+ uint32_t TimeOut = HSI_VALUE;
+ //Check to see if the Line is busy
+ //This bit is set automatically when a start condition is broadcasted on the line (even from another master)
+ //and is reset when stop condition is detected.
+ while ((I2Cx->SR2) & (I2C_SR2_BUSY)) {
+ if (!(TimeOut--)) {
+ // panic(0, "I2C Error\n");
+ while (1)
+ ; //
+ return 1;
+ }
+ }
 
-	 //Additonal check (not really necessary): Check to see if the mode is slave
-	 while((I2Cx->SR2) & (I2C_SR2_MSL)) {
-	 if (!(TimeOut--)) {
-	 panic(0, "I2C Error\n");
-	 return 1;
-	 }
-	 }
+ //Additonal check (not really necessary): Check to see if the mode is slave
+ while((I2Cx->SR2) & (I2C_SR2_MSL)) {
+ if (!(TimeOut--)) {
+ panic(0, "I2C Error\n");
+ return 1;
+ }
+ }
 
-	return 0;
-}*/
-
+ return 0;
+ }*/
 
 /*
  static uint32_t I2C_Stop(void) {
