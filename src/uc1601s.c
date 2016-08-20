@@ -14,12 +14,12 @@ const char chargen[];
 void LCD_init(void)
 {
 
-  //Init reset pin (PC0) and BL pin
+  //Init reset pin (PB5) and BL (PB4) pin
   RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);
   GPIO_InitTypeDef gpio_port;
   gpio_port.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
   gpio_port.GPIO_Mode = GPIO_Mode_OUT;
-  gpio_port.GPIO_OType = GPIO_OType_OD;
+  gpio_port.GPIO_OType = GPIO_OType_PP;
   gpio_port.GPIO_Speed = GPIO_Speed_10MHz;
   GPIO_Init(GPIOB, &gpio_port);
   GPIO_ResetBits(GPIOB, GPIO_Pin_5 );
