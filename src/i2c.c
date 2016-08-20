@@ -2,12 +2,12 @@
 #include "i2c.h"
 
 //Internal functions
-static uint32_t I2C_Start(void);
-static uint32_t I2C_Addr(uint8_t DevAddr, uint8_t dir);
+//static uint32_t I2C_Start(void);
+//static uint32_t I2C_Addr(uint8_t DevAddr, uint8_t dir);
 static uint32_t I2C_Write(uint8_t byte);
 static uint32_t I2C_Read(uint8_t *pBuf);
-static uint32_t WaitSR1FlagsSet(uint32_t Flags);
-static uint32_t WaitLineIdle(void);
+//static uint32_t WaitSR1FlagsSet(uint32_t Flags);
+//static uint32_t WaitLineIdle(void);
 
 //GPIO and I2C Peripheral
 #define I2Cx                      I2C1  //Selected I2C peripheral
@@ -87,19 +87,23 @@ void I2C_LowLevel_DeInit(void) {
 uint32_t I2C_WrBuf(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
 
 	//Slave address configure
-	I2C_SlaveAddressConfig(I2Cx, DevAddr);
+	I2C_SlaveAddressConfig(I2Cx, (uint16_t) DevAddr);
 
 	//Set transfer direction
 	I2C_MasterRequestConfig(I2Cx, I2C_Direction_Transmitter);
 
+	//set number of bytes be transmitted
+	I2C_NumberOfBytesConfig(I2Cx, (uint8_t) cnt);
+
+	//set auto end mode
+	I2C_AutoEndCmd(I2Cx, ENABLE);
+
 	//Generate a Start condition
 	I2C_GenerateSTART(I2Cx, ENABLE);
 
-	//wait for line free
-
-
-
-
+	//wait for START bit resets - after start MCU send slave address
+	while ((I2Cx->CR2) & (I2C_CR2_START))
+		;
 
 	//Start Writing Data
 	while (cnt--) {
@@ -107,15 +111,15 @@ uint32_t I2C_WrBuf(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
 	}
 
 	//Wait for the data on the shift register to be transmitted completely
-	WaitSR1FlagsSet(I2C_SR1_BTF);
-	//Here TXE=BTF=1. Therefore the clock stretches again.
+	while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_TC))
+		;
 
 	//Order a stop condition at the end of the current tranmission (or if the clock is being streched, generate stop immediatelly)
-	I2Cx->CR1 |= I2C_CR1_STOP;
-	//Stop condition resets the TXE and BTF automatically.
+	//I2C_GenerateSTOP(I2Cx, ENABLE);
 
-	//Wait to be sure that line is iddle
-	WaitLineIdle();
+	//Wait to be sure that line is idle
+	while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY))
+		;
 
 	return 0;
 }
@@ -135,12 +139,17 @@ uint32_t I2C_WrBuf(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
  */
 uint32_t I2C_RdBufEasy(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
 
-	//Generate Start
-	I2C_Start();
+	//configure address
+	I2C_SlaveAddressConfig(I2Cx, DevAddr);
 
-	//Send I2C Device Address and clear ADDR
-	I2C_Addr(DevAddr, I2C_Direction_Receiver);
-	(void) I2Cx->SR2;
+	//configure direction
+	I2C_MasterRequestConfig(I2Cx, I2C_Direction_Receiver);
+
+	//set number of bytes to receive
+	I2C_NumberOfBytesConfig(I2Cx, (uint8_t) cnt);
+
+	//Generate Start
+	I2C_GenerateSTART(I2Cx, ENABLE);
 
 	while ((cnt--) > 1) {
 		I2C_Read(buf++);
@@ -297,20 +306,13 @@ static uint32_t I2C_Read(uint8_t *pBuf) {
 static uint32_t I2C_Write(uint8_t byte) {
 
 	//Write the byte to the DR
-	I2Cx->DR = byte;
+	I2C_SendData(I2Cx, byte);
 
 	//Wait till the content of DR is transferred to the shift Register.
-	return WaitSR1FlagsSet(I2C_SR1_TXE);
-	//At this point point DR is available for the next byte even if it is not actually transmitted from the shift register
-	//TXE will be reset automatically when DR is written again (TXE does not strecth the clock unless BTF is also set)
+	while (!I2C_GetFlagStatus(I2Cx, I2C_FLAG_TXIS))
+		;
+	return 0;
 
-	/*
-	 //Send Data
-	 I2C_SendData(I2Cx, byte);
-
-	 //Check Ev8 (Cleared with another DR write)
-	 return WaitEvent(I2C_EVENT_MASTER_BYTE_TRANSMITTING);
-	 */
 }
 
 static uint32_t I2C_Addr(uint8_t DevAddr, uint8_t dir) {
