@@ -36,7 +36,8 @@ void I2C_LowLevel_Init(void) {
 	//Configure and initialize the GPIOs
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_SCL | GPIO_Pin_SDA;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 
 	GPIO_PinAFConfig(GPIOB, GPIO_PinSource6, GPIO_AF_1);
@@ -46,8 +47,9 @@ void I2C_LowLevel_Init(void) {
 	I2C_InitStructure.I2C_Timing = 0x00201D2B;
 	I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
 	I2C_InitStructure.I2C_OwnAddress1 = 0x00; //We are the master. We don't need this
-	I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
+	I2C_InitStructure.I2C_Ack = I2C_Ack_Disable;
 	I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+	I2C_InitStructure.I2C_AnalogFilter = I2C_AnalogFilter_Enable;
 
 	//Initialize the Peripheral
 	I2C_Init(I2Cx, &I2C_InitStructure);
@@ -86,40 +88,30 @@ void I2C_LowLevel_DeInit(void) {
  */
 uint32_t I2C_WrBuf(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
 
-	//Slave address configure
-	I2C_SlaveAddressConfig(I2Cx, (uint16_t) DevAddr);
-
-	//Set transfer direction
-	I2C_MasterRequestConfig(I2Cx, I2C_Direction_Transmitter);
-
-	//set number of bytes be transmitted
-	I2C_NumberOfBytesConfig(I2Cx, (uint8_t) cnt);
-
-	//set auto end mode
-	I2C_AutoEndCmd(I2Cx, ENABLE);
-
-	//Generate a Start condition
-	I2C_GenerateSTART(I2Cx, ENABLE);
+	I2C_StretchClockCmd(I2Cx, ENABLE);
+	I2C_TransferHandling(I2Cx, DevAddr, cnt, I2C_SoftEnd_Mode,
+	I2C_Generate_Start_Write);
 
 	//wait for START bit resets - after start MCU send slave address
-	while ((I2Cx->CR2) & (I2C_CR2_START))
-		;
+	while ((I2Cx->CR2) & (I2C_CR2_START)) {
+	};
 
 	//Start Writing Data
 	while (cnt--) {
 		I2C_Write(*buf++);
 	}
+	//I2Cx->TXDR = *buf;
 
 	//Wait for the data on the shift register to be transmitted completely
-	while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_TC))
-		;
+	while ((I2Cx->ISR) & I2C_FLAG_TC) {
+	};
 
 	//Order a stop condition at the end of the current tranmission (or if the clock is being streched, generate stop immediatelly)
-	//I2C_GenerateSTOP(I2Cx, ENABLE);
+	I2Cx->CR2 |= I2C_CR2_STOP;
 
 	//Wait to be sure that line is idle
-	/*while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY))
-		;*/
+	//while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY))
+	;
 
 	return 0;
 }
@@ -283,15 +275,14 @@ static uint32_t I2C_Read(uint8_t *pBuf) {
 
 static uint32_t I2C_Write(uint8_t byte) {
 
-	//Wait till the content of DR is transferred to the shift Register.
-	while (!((I2Cx->ISR) & (I2C_FLAG_TXE))) {
-	};
-
 	//Write the byte to the DR
 	I2C_SendData(I2Cx, byte);
 
-	return 0;
+	//Wait till the content of DR is transferred to the shift Register.
+	while (!((I2Cx->ISR) & I2C_FLAG_TXE)) {
+	};
 
+	return 0;
 }
 
 /*static uint32_t I2C_Addr(uint8_t DevAddr, uint8_t dir) {

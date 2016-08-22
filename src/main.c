@@ -20,8 +20,6 @@ int main(void) {
 
   LCD_init();
 
-  //debug
-  LCD_string("10x15", 0, 0, FONT_TYPE_10x15, INVERSE_TYPE_NOINVERSE);
 
 
   //Enable TIM2 IRQ
@@ -31,6 +29,12 @@ int main(void) {
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
 
+
+  //debug section
+  //todo
+
+
+
   while (1) {}; // Infinity loop
 }
 
@@ -38,7 +42,7 @@ void TIM2_IRQHandler(void) {
   TIM_ClearITPendingBit(TIM2, TIM_SR_UIF );
 
   // Some LCD demonstrations
- LCD_clear(0);
+/* LCD_clear(0);
   switch (i++ % 7) {
     case 0:
       LCD_string("10x15", 0, 0, FONT_TYPE_10x15, INVERSE_TYPE_NOINVERSE);
@@ -76,6 +80,6 @@ void TIM2_IRQHandler(void) {
       }
       break;
     }
-  }
+  }*/
 }
 

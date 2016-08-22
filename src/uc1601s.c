@@ -22,11 +22,14 @@ void LCD_init(void)
   gpio_port.GPIO_OType = GPIO_OType_PP;
   gpio_port.GPIO_Speed = GPIO_Speed_10MHz;
   GPIO_Init(GPIOB, &gpio_port);
+
+  I2C_LowLevel_Init();
+
   GPIO_ResetBits(GPIOB, GPIO_Pin_5 );
+  tool_delay_ms(10);
+  GPIO_WriteBit(GPIOB, GPIO_Pin_5, Bit_SET); // Unreset
   GPIO_WriteBit(GPIOB, GPIO_Pin_4, Bit_SET); //Power On BackLight
 
-  GPIO_WriteBit(GPIOB, GPIO_Pin_5, Bit_SET); // Unreset
-  I2C_LowLevel_Init();
   tool_delay_ms(10); // 1ms - 10ms
   {
     uint8_t buf[] = { 0b11100010 }; //System Reset
