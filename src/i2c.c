@@ -44,7 +44,7 @@ void I2C_LowLevel_Init(void) {
 	GPIO_PinAFConfig(GPIOB, GPIO_PinSource7, GPIO_AF_1);
 
 	//Configure and Initialize the I2C
-	I2C_InitStructure.I2C_Timing = 0x00201D2B;
+	I2C_InitStructure.I2C_Timing = 0x0010020A;
 	I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
 	I2C_InitStructure.I2C_OwnAddress1 = 0x00; //We are the master. We don't need this
 	I2C_InitStructure.I2C_Ack = I2C_Ack_Disable;

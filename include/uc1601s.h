@@ -6,7 +6,7 @@
 // select your display
 //#define LCD154
 //#define LCD077
-#define LCD120
+#define LCD077
 
 #ifdef LCD154 //132-64
   #define LCD_WIDTH 132
@@ -20,7 +20,7 @@
 
 #ifdef LCD077//128-64
   #define LCD_WIDTH 128
-  #define LCD_HEIGHT 66
+  #define LCD_HEIGHT 64
 #endif
 
 typedef enum {
