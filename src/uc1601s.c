@@ -50,7 +50,7 @@ void LCD_init(void)
 #else
   {
     // same as for LCD154 but with Mirror X SEG/Column sequence inversion OFF
-    uint8_t buf[] = { 0b11101011, 0b10000001, 120, 0b11000000, 0b10101111 };
+    uint8_t buf[] = { 0b11101011, 0b10000001, 128, 0b11000000, 0b10101111 };
     I2C_WrBuf(0x70, buf, sizeof(buf));
   }
 #endif

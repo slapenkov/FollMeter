@@ -103,7 +103,7 @@ uint32_t I2C_WrBuf(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
 	//I2Cx->TXDR = *buf;
 
 	//Wait for the data on the shift register to be transmitted completely
-	while ((I2Cx->ISR) & I2C_FLAG_TC) {
+	while (!((I2Cx->ISR) & (I2C_FLAG_TC | I2C_FLAG_BUSY))) {
 	};
 
 	//Order a stop condition at the end of the current tranmission (or if the clock is being streched, generate stop immediatelly)
@@ -131,27 +131,23 @@ uint32_t I2C_WrBuf(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
  */
 uint32_t I2C_RdBuf(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
 
-	//configure address
-	I2C_SlaveAddressConfig(I2Cx, DevAddr);
+	I2C_StretchClockCmd(I2Cx, ENABLE);
+	I2C_TransferHandling(I2Cx, DevAddr, cnt, I2C_SoftEnd_Mode,
+	I2C_Generate_Start_Read);
 
-	//configure direction
-	I2C_MasterRequestConfig(I2Cx, I2C_Direction_Receiver);
-
-	//set number of bytes to receive
-	I2C_NumberOfBytesConfig(I2Cx, (uint8_t) cnt);
-
-	//set auto end mode
-	I2C_AutoEndCmd(I2Cx, ENABLE);
-
-	//Generate Start
-	I2C_GenerateSTART(I2Cx, ENABLE);
+	//wait for START bit resets - after start MCU send slave address
+	while ((I2Cx->CR2) & (I2C_CR2_START)) {
+	};
 
 	while (cnt--) {
 		I2C_Read(buf++);
 	}
 
+	//Order a stop condition at the end of the current tranmission (or if the clock is being streched, generate stop immediatelly)
+	I2Cx->CR2 |= I2C_CR2_STOP;
+
 	//Make Sure Stop bit is cleared and Line is now Idle
-	while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY))
+	while (!I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY))
 		;
 
 	return 0;
@@ -264,8 +260,8 @@ uint32_t I2C_RdBuf(uint8_t DevAddr, uint8_t *buf, uint32_t cnt) {
 static uint32_t I2C_Read(uint8_t *pBuf) {
 
 	//Wait till new data is ready to be read
-	while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_RXNE))
-		;
+	while (!I2C_GetFlagStatus(I2Cx, I2C_FLAG_RXNE)) {
+	};
 
 	//read data and clear RXNE bit
 	*pBuf = I2C_ReceiveData(I2Cx);
@@ -279,7 +275,7 @@ static uint32_t I2C_Write(uint8_t byte) {
 	I2C_SendData(I2Cx, byte);
 
 	//Wait till the content of DR is transferred to the shift Register.
-	while (!((I2Cx->ISR) & I2C_FLAG_TXE)) {
+	while (!((I2Cx->ISR) & (I2C_FLAG_TXE))) {
 	};
 
 	return 0;
