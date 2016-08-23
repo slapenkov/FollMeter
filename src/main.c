@@ -30,6 +30,7 @@ int main(void) {
 	//debug section
 	//todo
 	//LCD_string("10x15", 0, 0, FONT_TYPE_10x15, INVERSE_TYPE_NOINVERSE);
+	//LCD_string("5x8", 16, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 
 	while (1) {
 	}; // Infinity loop

@@ -417,9 +417,9 @@ void LCD_symbol(char code, uint8_t width, uint8_t height, inverse_type inverse) 
 		if (heightf == 0) //char-s of single (1) height
 				{
 			if ((uint8_t) inverse) {
-				vline = ~(uint8_t) chargen[chargen_index + b];
+				vline = (~chargen[chargen_index + b]) & 0x000000ff;
 			} else {
-				vline = chargen[chargen_index + b]; //else single load
+				vline = chargen[chargen_index + b] & 0x000000ff; //else single load
 			}
 
 			vline = vline << vert_offset;
@@ -433,12 +433,12 @@ void LCD_symbol(char code, uint8_t width, uint8_t height, inverse_type inverse) 
 			} else {
 				buf = chargen[chargen_index + b];
 			}
-			mask = 0b00000001;
+			mask = 0b00000000000000000000000000000001;
 			vline = 0;
 			for (z = 0; z < 8; z++) {
 				vline = vline >> 2;
 				if (buf & mask) {
-					vline |= 0b1100000000000000;
+					vline |= 0b00000000000000001100000000000000;
 				}
 				mask = mask << 1;
 			}
@@ -452,30 +452,30 @@ void LCD_symbol(char code, uint8_t width, uint8_t height, inverse_type inverse) 
 		for (a = 1; a < widthf; a++) {
 			if (cursorX > 131) // out of display 131
 					{
-				uint8_t buf[] = { 0b10001001 }; // move by column +
-				I2C_WrBuf(0x70, buf, sizeof(buf));
+				uint8_t buffer[] = { 0b10001001 }; // move by column +
+				I2C_WrBuf(0x70, buffer, sizeof(buffer));
 
 				return;
 			}
 			LCD_cursor(cursorX, cursorY);
 			// read all column (4 page)
 			{
-				uint8_t buf[] = { 0b10001011 }; // move by page +
-				I2C_WrBuf(0x70, buf, sizeof(buf));
+				uint8_t buffer[] = { 0b10001011 }; // move by page +
+				I2C_WrBuf(0x70, buffer, sizeof(buffer));
 			}
 
 			//read all display column (32 bit)
 			{
-				uint8_t buf[6]; //0-th byte and 5-fth are fake
-				I2C_RdBuf(0x70 | 2, buf, sizeof(buf));
+				uint8_t buffer[6]; //0-th byte and 5-fth are fake
+				I2C_RdBuf(0x70 | 2, buffer, sizeof(buffer));
 
-				fon = buf[4];
+				fon = buffer[4];
 				fon = fon << 8;
-				fon += buf[3];
+				fon += buffer[3];
 				fon = fon << 8;
-				fon += buf[2];
+				fon += buffer[2];
 				fon = fon << 8;
-				fon += buf[1];
+				fon += buffer[1];
 			}
 
 			//generate mask for clear vertical line region
@@ -511,14 +511,14 @@ void LCD_symbol(char code, uint8_t width, uint8_t height, inverse_type inverse) 
 			cursorX++;
 
 			{
-				uint8_t buf[] = { 0b10001011 }; // move by page +
-				I2C_WrBuf(0x70, buf, sizeof(buf));
+				uint8_t buffer[] = { 0b10001011 }; // move by page +
+				I2C_WrBuf(0x70, buffer, sizeof(buffer));
 			}
 
 			{
-				uint8_t buff[] = { buf & 0xff, (buf >> 8) & 0xff, (buf >> 16)
-						& 0xff, (buf >> 24) & 0xff };
-				I2C_WrBuf(0x70 | 2, buff, sizeof(buf));
+				uint8_t buffer[] = { buf & 0x000000ff, (buf >> 8) & 0x000000ff,
+						(buf >> 16) & 0x000000ff, (buf >> 24) & 0x000000ff };
+				I2C_WrBuf(0x70 | 2, buffer, sizeof(buffer));
 			}
 		}
 	}
@@ -527,21 +527,21 @@ void LCD_symbol(char code, uint8_t width, uint8_t height, inverse_type inverse) 
 
 	// == Clear separator line (1px between chars) ==
 	{
-		uint8_t buf[] = { 0b10001011 }; // move by page +
-		I2C_WrBuf(0x70, buf, sizeof(buf));
+		uint8_t buffer[] = { 0b10001011 }; // move by page +
+		I2C_WrBuf(0x70, buffer, sizeof(buffer));
 	}
 
 	{
-		uint8_t buf[6];
-		I2C_RdBuf(0x70 | 2, buf, sizeof(buf));
+		uint8_t buffer[6];
+		I2C_RdBuf(0x70 | 2, buffer, sizeof(buffer));
 
-		fon = buf[4];
+		fon = buffer[4];
 		fon = fon << 8;
-		fon += buf[3];
+		fon += buffer[3];
 		fon = fon << 8;
-		fon += buf[2];
+		fon += buffer[2];
 		fon = fon << 8;
-		fon += buf[1];
+		fon += buffer[1];
 	}
 
 	//generate mask for clear vertical line region
@@ -578,19 +578,19 @@ void LCD_symbol(char code, uint8_t width, uint8_t height, inverse_type inverse) 
 	cursorX++;
 
 	{
-		uint8_t buf[] = { 0b10001011 };
-		I2C_WrBuf(0x70, buf, sizeof(buf));
+		uint8_t buffer[] = { 0b10001011 };
+		I2C_WrBuf(0x70, buffer, sizeof(buffer));
 	}
 
 	{
-		uint8_t buff[] = { buf & 0xff, (buf >> 8) & 0xff, (buf >> 16) & 0xff,
-				(buf >> 24) & 0xff };
-		I2C_WrBuf(0x70 | 2, buff, sizeof(buf));
+		uint8_t buffer[] = { buf & 0x000000ff, (buf >> 8) & 0x000000ff, (buf
+				>> 16) & 0x000000ff, (buf >> 24) & 0x000000ff };
+		I2C_WrBuf(0x70 | 2, buffer, sizeof(buffer));
 	}
 
 	{
-		uint8_t buf[] = { 0b10001001 };
-		I2C_WrBuf(0x70, buf, sizeof(buf));
+		uint8_t buffer[] = { 0b10001001 };
+		I2C_WrBuf(0x70, buffer, sizeof(buffer));
 	}
 
 }
