@@ -16,7 +16,7 @@ int main(void) {
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
 	TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
-	TIM_Cmd(TIM2, ENABLE);
+	//TIM_Cmd(TIM2, ENABLE);
 
 	LCD_init();
 
@@ -24,13 +24,39 @@ int main(void) {
 	NVIC_InitTypeDef NVIC_InitStructure;
 	NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPriority = 0;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = DISABLE; //modified @todo
 	NVIC_Init(&NVIC_InitStructure);
 
-	//debug section
-	//todo
-	//LCD_string("10x15", 0, 0, FONT_TYPE_10x15, INVERSE_TYPE_NOINVERSE);
-	//LCD_string("5x8", 16, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	//preload section
+	LCD_string("Impedance scanner", 15, 56, FONT_TYPE_5x8,
+			INVERSE_TYPE_NOINVERSE);
+	LCD_string("FIS-01", 45, 40, FONT_TYPE_5x15, INVERSE_TYPE_NOINVERSE);
+	LCD_string("Firmware v0.0.1", 15, 32, FONT_TYPE_5x8,
+			INVERSE_TYPE_NOINVERSE);
+	LCD_string("Dnipro 2016", 30, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("Loading,please wait...", 0, 0, FONT_TYPE_5x8,
+			INVERSE_TYPE_NOINVERSE);
+
+	//math prepeare section
+	//@todo add initialization
+
+	//main interface section
+	LCD_clear(0);
+	LCD_string("<001.00", 0, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("002.00", 46, 56, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
+	LCD_string("004.00>", 88, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_line(LINE_TYPE_DOT, 0, 52, 127, 52);
+	LCD_string("Re{Z},Ohms =", 0, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("333.34R", 75, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("Im{Z},Ohms =", 0, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("100.00K", 75, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("Ampl.,mV   =", 0, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("670.22", 75, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("Phase,rad  =", 0, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE); //phase
+	LCD_string("000.12", 75, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_line(LINE_TYPE_DOT, 0, 12, 127, 12);
+	LCD_string("...processing...", 15, 0, FONT_TYPE_5x8,
+			INVERSE_TYPE_NOINVERSE); //processing message and scanner trend area
 
 	while (1) {
 	}; // Infinity loop
