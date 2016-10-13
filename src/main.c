@@ -56,6 +56,10 @@ int main(void) {
 	LCD_string("...processing...", 15, 0, FONT_TYPE_5x8,
 			INVERSE_TYPE_NOINVERSE); //processing message and scanner trend area
 
+
+	//@todo debug
+	adc_buf[0] = 0;
+
 	while (1) {
 	}; // Infinity loop
 }
