@@ -1,6 +1,4 @@
-#include "stm32f0xx.h"
-#include "uc1601s.h"
-#include "tools.h"
+#include "main.h"
 
 uint8_t i = 0;
 

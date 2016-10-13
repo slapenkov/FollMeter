@@ -146,11 +146,6 @@
 					<fileInfo id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1165648365.677685216" name="stm32f0xx_conf.h" rcbsApplicability="disable" resourcePath="include/stm32f0xx_conf.h" toolsToInvoke=""/>
 					<fileInfo id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1165648365.270286952" name="i2c.h" rcbsApplicability="disable" resourcePath="include/i2c.h" toolsToInvoke=""/>
 					<fileInfo id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1165648365.1111539579" name="stm32f0xx_adc.h" rcbsApplicability="disable" resourcePath="system/include/stm32f0-stdperiph/stm32f0xx_adc.h" toolsToInvoke=""/>
-					<fileInfo id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1165648365.238760292" name="i2c.c" rcbsApplicability="disable" resourcePath="src/i2c.c" toolsToInvoke="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.1966590781.1012623596">
-						<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.1966590781.1012623596" name="Cross ARM C Compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.1966590781">
-							<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input.1879154645" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input"/>
-						</tool>
-					</fileInfo>
 					<sourceEntries>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
