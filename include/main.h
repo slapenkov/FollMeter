@@ -11,7 +11,8 @@
 #include "stm32f0xx.h"
 #include "uc1601s.h"
 #include "tools.h"
-//#include "strings.h"
+#include "tsl_types.h"
+#include "tsl_user.h"
 
 /* Defines section */
 #define DAC_POINTS 10

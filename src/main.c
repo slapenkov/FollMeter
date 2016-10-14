@@ -1,5 +1,9 @@
 #include "main.h"
 
+/* Private variables ---------------------------------------------------------*/
+static __IO uint32_t TimingDelay;
+
+
 uint8_t i = 0;
 
 int main(void) {
@@ -116,3 +120,138 @@ void TIM2_IRQHandler(void) {
 	}
 }
 
+/**
+* @brief  configure linear touch sensor (LTS),
+*         Leds On corresponding to the current LTS TouchKey pointed
+* @param  None
+* @retval None
+*/
+void LTS_Test(void)
+{
+
+  while ((STM_EVAL_PBGetState(BUTTON_USER) != Bit_SET))
+  {
+    /* Execute STMTouch Driver state machine */
+    if (TSL_user_Action() == TSL_STATUS_OK)
+    {
+      ProcessSensors(); // Execute sensors related tasks
+    }
+  }
+  /* Wait for User button is released */
+  while (STM_EVAL_PBGetState(BUTTON_USER) != Bit_RESET)
+  {}
+    /* Turn Off Leds */
+  STM_EVAL_LEDOff(LED3);
+  STM_EVAL_LEDOff(LED4);
+  STM_EVAL_LEDOff(LED5);
+  STM_EVAL_LEDOff(LED6);
+
+  /* SysTick time base  was  modified during TLS Test, for this we reconfigure
+     the SysTick to have a time base of 1ms */
+  if (SysTick_Config(SystemCoreClock / 1000))
+  {
+    /* Capture error */
+    while (1);
+  }
+
+}
+
+
+
+/**
+  * @brief  Manage the activity on sensors when touched/released (example)
+  * @param  None
+  * @retval None
+  */
+void ProcessSensors(void)
+{
+  STM_EVAL_LEDOff(LED3);
+  STM_EVAL_LEDOff(LED4);
+  STM_EVAL_LEDOff(LED5);
+  STM_EVAL_LEDOff(LED6);
+
+  if ((MyLinRots[0].p_Data->StateId == TSL_STATEID_DETECT) ||
+      (MyLinRots[0].p_Data->StateId == TSL_STATEID_DEB_RELEASE_DETECT))
+  {
+    if (MyLinRots[0].p_Data->Position > 0)
+    {
+      STM_EVAL_LEDOn(LED6);
+    }
+
+    if (MyLinRots[0].p_Data->Position >= 48)
+    {
+      STM_EVAL_LEDOn(LED5);
+    }
+
+    if (MyLinRots[0].p_Data->Position >= 80)
+    {
+      STM_EVAL_LEDOn(LED3);
+    }
+
+    if (MyLinRots[0].p_Data->Position >= 112)
+    {
+      STM_EVAL_LEDOn(LED4);
+    }
+  }
+
+}
+
+/**
+  * @brief  Executed when a sensor is in Off state
+  * @param  None
+  * @retval None
+  */
+void MyLinRots_OffStateProcess(void)
+{
+  /* Add here your own processing when a sensor is in Off state */
+}
+
+/**
+  * @brief  Executed at each timer interruption (option must be enabled)
+  * @param  None
+  * @retval None
+  */
+void TSL_CallBack_TimerTick(void)
+{
+}
+
+/**
+  * @brief  Executed when a sensor is in Error state
+  * @param  None
+  * @retval None
+  */
+void MyLinRots_ErrorStateProcess(void)
+{
+  /* Add here your own processing when a sensor is in Error state */
+  TSL_linrot_SetStateOff();
+  while(1)
+  {
+    /* Insert 1s delay */
+    Delay(100);
+  }
+}
+
+/**
+  * @brief  Inserts a delay time.
+  * @param  nTime: specifies the delay time length, in 10 ms.
+  * @retval None
+  */
+void Delay(__IO uint32_t nTime)
+{
+  TimingDelay = nTime;
+
+  while(TimingDelay != 0);
+}
+
+/**
+  * @brief  Decrements the TimingDelay variable.
+  * @param  None
+  * @retval None
+  */
+void TimingDelay_Decrement(void)
+{
+  if (TimingDelay != 0x00)
+  {
+    TimingDelay--;
+  }
+}
