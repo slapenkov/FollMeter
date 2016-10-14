@@ -37,12 +37,20 @@ int main(void) {
 
 	//math prepeare section
 	//@todo add initialization
+	char strFreqPrev[6];
+	char strFreqSel[6];
+	char strFreqNext[6];
+	sprintf(strFreqPrev, "%06.2f", freq_set[freq_idx - 1]);
+	sprintf(strFreqSel, "%06.2f", freq_set[freq_idx]);
+	sprintf(strFreqNext, "%06.2f", freq_set[freq_idx + 1]);
 
 	//main interface section
 	LCD_clear(0);
-	LCD_string("<001.00", 0, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	LCD_string("002.00", 46, 56, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
-	LCD_string("004.00>", 88, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("<", 0, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string(strFreqPrev, 5, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string(strFreqSel, 48, 56, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
+	LCD_string(strFreqNext, 92, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string(">", 122, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_line(LINE_TYPE_DOT, 0, 52, 127, 52);
 	LCD_string("Re{Z},Ohms =", 0, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string("333.34R", 75, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
@@ -55,7 +63,6 @@ int main(void) {
 	LCD_line(LINE_TYPE_DOT, 0, 12, 127, 12);
 	LCD_string("...processing...", 15, 0, FONT_TYPE_5x8,
 			INVERSE_TYPE_NOINVERSE); //processing message and scanner trend area
-
 
 	//@todo debug
 	adc_buf[0] = 0;
