@@ -3,10 +3,10 @@
 /* Private variables ---------------------------------------------------------*/
 static __IO uint32_t TimingDelay;
 
-
 uint8_t i = 0;
 
 int main(void) {
+
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE); // Enable TIM2 Periph clock
 
 	// Timer base configuration
@@ -29,6 +29,13 @@ int main(void) {
 	NVIC_InitStructure.NVIC_IRQChannelCmd = DISABLE; //modified @todo
 	NVIC_Init(&NVIC_InitStructure);
 
+	/* Init STMTouch driver */
+	TSL_user_Init();
+	STM_EVAL_LEDInit(LED3);
+	STM_EVAL_LEDInit(LED4);
+	STM_EVAL_LEDInit(LED5);
+	STM_EVAL_LEDInit(LED6);
+
 	//preload section
 	LCD_string("Impedance scanner", 15, 56, FONT_TYPE_5x8,
 			INVERSE_TYPE_NOINVERSE);
@@ -41,21 +48,21 @@ int main(void) {
 
 	//math prepeare section
 	//@todo add initialization
-	char strFreqPrev[6];
-	char strFreqSel[6];
-	char strFreqNext[6];
+
+	//main interface section
 	sprintf(strFreqPrev, "%06.2f", freq_set[freq_idx - 1]);
 	sprintf(strFreqSel, "%06.2f", freq_set[freq_idx]);
 	sprintf(strFreqNext, "%06.2f", freq_set[freq_idx + 1]);
 
-	//main interface section
 	LCD_clear(0);
 	LCD_string("<", 0, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string(strFreqPrev, 5, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string(strFreqSel, 48, 56, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
 	LCD_string(strFreqNext, 92, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string(">", 122, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+
 	LCD_line(LINE_TYPE_DOT, 0, 52, 127, 52);
+
 	LCD_string("Re{Z},Ohms =", 0, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string("333.34R", 75, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string("Im{Z},Ohms =", 0, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
@@ -64,15 +71,56 @@ int main(void) {
 	LCD_string("670.22", 75, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string("Phase,rad  =", 0, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE); //phase
 	LCD_string("000.12", 75, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+
 	LCD_line(LINE_TYPE_DOT, 0, 12, 127, 12);
+
 	LCD_string("...processing...", 15, 0, FONT_TYPE_5x8,
 			INVERSE_TYPE_NOINVERSE); //processing message and scanner trend area
 
+	//SystemTick
+	/* Setup SysTick Timer for 1 msec interrupts.*/
+	if (SysTick_Config(SystemCoreClock / 1000)) {
+		/* Capture error */
+		while (1)
+			;
+	}
+
 	//@todo debug
-	adc_buf[0] = 0;
+//	adc_buf[0] = 0;
 
 	while (1) {
-	}; // Infinity loop
+		//@todo
+		//test for measurement ends and start math processing if needed
+
+		//touch keys processing
+		if (TSL_user_Action() == TSL_STATUS_OK) {
+			ProcessSensors(); // Execute sensors related tasks
+			//process key code action
+			if ((prev_key == 0) & (key != 0)) {
+				//key pressed detected
+				switch (key) {
+				case FIRST_KEY:
+					freq_idx--;
+					if (freq_idx == 0)
+						freq_idx++;
+					break;
+				case SECOND_KEY:
+					break;
+				case THIRD_KEY:
+					break;
+				case FOURTH_KEY:
+					freq_idx++;
+					if (freq_idx + 1 == sizeof(freq_set) / sizeof(float))
+						freq_idx--;
+					break;
+				}
+				//update screen
+				FreqScreenUpdate(freq_idx);
+				//reset measurement
+			}
+			prev_key = key; //store previous state
+		}
+	} // Infinity loop
 }
 
 void TIM2_IRQHandler(void) {
@@ -121,137 +169,110 @@ void TIM2_IRQHandler(void) {
 }
 
 /**
-* @brief  configure linear touch sensor (LTS),
-*         Leds On corresponding to the current LTS TouchKey pointed
-* @param  None
-* @retval None
-*/
-void LTS_Test(void)
-{
+ * @brief  Manage the activity on sensors when touched/released (example)
+ * @param  None
+ * @retval None
+ */
+void ProcessSensors(void) {
+	key = 0;
+	if ((MyLinRots[0].p_Data->StateId == TSL_STATEID_DETECT)
+			|| (MyLinRots[0].p_Data->StateId == TSL_STATEID_DEB_RELEASE_DETECT)) {
 
-  while ((STM_EVAL_PBGetState(BUTTON_USER) != Bit_SET))
-  {
-    /* Execute STMTouch Driver state machine */
-    if (TSL_user_Action() == TSL_STATUS_OK)
-    {
-      ProcessSensors(); // Execute sensors related tasks
-    }
-  }
-  /* Wait for User button is released */
-  while (STM_EVAL_PBGetState(BUTTON_USER) != Bit_RESET)
-  {}
-    /* Turn Off Leds */
-  STM_EVAL_LEDOff(LED3);
-  STM_EVAL_LEDOff(LED4);
-  STM_EVAL_LEDOff(LED5);
-  STM_EVAL_LEDOff(LED6);
+		if (MyLinRots[0].p_Data->Position > 0) {
+			key = FIRST_KEY;
+		}
 
-  /* SysTick time base  was  modified during TLS Test, for this we reconfigure
-     the SysTick to have a time base of 1ms */
-  if (SysTick_Config(SystemCoreClock / 1000))
-  {
-    /* Capture error */
-    while (1);
-  }
+		if (MyLinRots[0].p_Data->Position >= 48) {
+			key = SECOND_KEY;
+		}
 
+		if (MyLinRots[0].p_Data->Position >= 80) {
+			key = THIRD_KEY;
+		}
+
+		if (MyLinRots[0].p_Data->Position >= 112) {
+			key = FOURTH_KEY;
+		}
+	}
 }
 
+/*
+ * Frequency screen update by index
+ * */
+void FreqScreenUpdate(int idx) {
+	char temp[] = { 0x20 };
 
+	//prepare strings
+	sprintf(strFreqPrev, "%06.2f", freq_set[freq_idx - 1]);
+	sprintf(strFreqSel, "%06.2f", freq_set[freq_idx]);
+	sprintf(strFreqNext, "%06.2f", freq_set[freq_idx + 1]);
 
-/**
-  * @brief  Manage the activity on sensors when touched/released (example)
-  * @param  None
-  * @retval None
-  */
-void ProcessSensors(void)
-{
-  STM_EVAL_LEDOff(LED3);
-  STM_EVAL_LEDOff(LED4);
-  STM_EVAL_LEDOff(LED5);
-  STM_EVAL_LEDOff(LED6);
-
-  if ((MyLinRots[0].p_Data->StateId == TSL_STATEID_DETECT) ||
-      (MyLinRots[0].p_Data->StateId == TSL_STATEID_DEB_RELEASE_DETECT))
-  {
-    if (MyLinRots[0].p_Data->Position > 0)
-    {
-      STM_EVAL_LEDOn(LED6);
-    }
-
-    if (MyLinRots[0].p_Data->Position >= 48)
-    {
-      STM_EVAL_LEDOn(LED5);
-    }
-
-    if (MyLinRots[0].p_Data->Position >= 80)
-    {
-      STM_EVAL_LEDOn(LED3);
-    }
-
-    if (MyLinRots[0].p_Data->Position >= 112)
-    {
-      STM_EVAL_LEDOn(LED4);
-    }
-  }
+	//redraw screen
+	if ((idx - 1) > 0) {
+		temp[0] = 0x3c;
+	}
+	LCD_string(temp, 0, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string(strFreqPrev, 5, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string(strFreqSel, 48, 56, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
+	LCD_string(strFreqNext, 92, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	temp[0] = 0x20;
+	if ((idx + 2) < sizeof(freq_set) / sizeof(float)) {
+		temp[0] = 0x3e;
+	}
+	LCD_string(temp, 122, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 
 }
 
 /**
-  * @brief  Executed when a sensor is in Off state
-  * @param  None
-  * @retval None
-  */
-void MyLinRots_OffStateProcess(void)
-{
-  /* Add here your own processing when a sensor is in Off state */
+ * @brief  Executed when a sensor is in Off state
+ * @param  None
+ * @retval None
+ */
+void MyLinRots_OffStateProcess(void) {
+	/* Add here your own processing when a sensor is in Off state */
 }
 
 /**
-  * @brief  Executed at each timer interruption (option must be enabled)
-  * @param  None
-  * @retval None
-  */
-void TSL_CallBack_TimerTick(void)
-{
+ * @brief  Executed at each timer interruption (option must be enabled)
+ * @param  None
+ * @retval None
+ */
+void TSL_CallBack_TimerTick(void) {
 }
 
 /**
-  * @brief  Executed when a sensor is in Error state
-  * @param  None
-  * @retval None
-  */
-void MyLinRots_ErrorStateProcess(void)
-{
-  /* Add here your own processing when a sensor is in Error state */
-  TSL_linrot_SetStateOff();
-  while(1)
-  {
-    /* Insert 1s delay */
-    Delay(100);
-  }
+ * @brief  Executed when a sensor is in Error state
+ * @param  None
+ * @retval None
+ */
+void MyLinRots_ErrorStateProcess(void) {
+	/* Add here your own processing when a sensor is in Error state */
+	TSL_linrot_SetStateOff();
+	while (1) {
+		/* Insert 1s delay */
+		Delay(100);
+	}
 }
 
 /**
-  * @brief  Inserts a delay time.
-  * @param  nTime: specifies the delay time length, in 10 ms.
-  * @retval None
-  */
-void Delay(__IO uint32_t nTime)
-{
-  TimingDelay = nTime;
+ * @brief  Inserts a delay time.
+ * @param  nTime: specifies the delay time length, in 10 ms.
+ * @retval None
+ */
+void Delay(__IO uint32_t nTime) {
+	TimingDelay = nTime;
 
-  while(TimingDelay != 0);
+	while (TimingDelay != 0)
+		;
 }
 
 /**
-  * @brief  Decrements the TimingDelay variable.
-  * @param  None
-  * @retval None
-  */
-void TimingDelay_Decrement(void)
-{
-  if (TimingDelay != 0x00)
-  {
-    TimingDelay--;
-  }
+ * @brief  Decrements the TimingDelay variable.
+ * @param  None
+ * @retval None
+ */
+void TimingDelay_Decrement(void) {
+	if (TimingDelay != 0x00) {
+		TimingDelay--;
+	}
 }
