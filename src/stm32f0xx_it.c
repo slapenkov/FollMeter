@@ -97,7 +97,7 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   //TimingDelay_Decrement();
-  TSL_tim_ProcessIT();
+  //TSL_tim_ProcessIT();
 }
 
 /******************************************************************************/

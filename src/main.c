@@ -1,40 +1,31 @@
 #include "main.h"
 
-/* Private variables ---------------------------------------------------------*/
-static __IO uint32_t TimingDelay;
-
-uint8_t i = 0;
+/* Consts */
+const uint16_t Sine12bit[DAC_POINTS] = { 2048, 3251, 3995, 3996, 3253, 2051,
+		847, 101, 98, 839 };
 
 int main(void) {
 
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE); // Enable TIM2 Periph clock
+	// Set up 48 MHz Core Clock using HSI (8Mhz) with PLL x 6
+	RCC_PLLConfig(RCC_PLLSource_HSI, RCC_PLLMul_6);
+	RCC_PLLCmd(ENABLE);
 
-	// Timer base configuration
-	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
-	TIM_TimeBaseStructure.TIM_Period = 2000;  //Period - 2s
-	TIM_TimeBaseStructure.TIM_Prescaler = (uint16_t) (SystemCoreClock / 1000)
-			- 1; //1000 Hz
-	TIM_TimeBaseStructure.TIM_ClockDivision = 0;
-	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
-	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
-	//TIM_Cmd(TIM2, ENABLE);
+	// Wait for PLLRDY after enabling PLL.
+	while (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) != SET) {
+	}
 
+	RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK); // Select the PLL as clock source.
+	SystemCoreClockUpdate();
+
+	//LCD init
 	LCD_init();
 
-	//Enable TIM2 IRQ
-	NVIC_InitTypeDef NVIC_InitStructure;
-	NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPriority = 0;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = DISABLE; //modified @todo
-	NVIC_Init(&NVIC_InitStructure);
+	//Peripheral configure
+	DAC_Config();
+	TIM2_Config();
 
 	/* Init STMTouch driver */
 	TSL_user_Init();
-	STM_EVAL_LEDInit(LED3);
-	STM_EVAL_LEDInit(LED4);
-	STM_EVAL_LEDInit(LED5);
-	STM_EVAL_LEDInit(LED6);
 
 	//preload section
 	LCD_string("Impedance scanner", 15, 56, FONT_TYPE_5x8,
@@ -67,7 +58,7 @@ int main(void) {
 	LCD_string("333.34R", 75, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string("Im{Z},Ohms =", 0, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string("100.00K", 75, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	LCD_string("Ampl.,mV   =", 0, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("Ampl.,Ohms =", 0, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string("670.22", 75, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string("Phase,rad  =", 0, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE); //phase
 	LCD_string("000.12", 75, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
@@ -86,7 +77,7 @@ int main(void) {
 	}
 
 	//@todo debug
-//	adc_buf[0] = 0;
+	adc_buf[0] = 0;
 
 	while (1) {
 		//@todo
@@ -117,55 +108,126 @@ int main(void) {
 				//update screen
 				FreqScreenUpdate(freq_idx);
 				//reset measurement
+				ReInitMeasurements();
 			}
 			prev_key = key; //store previous state
 		}
 	} // Infinity loop
 }
 
-void TIM2_IRQHandler(void) {
-	TIM_ClearITPendingBit(TIM2, TIM_SR_UIF);
+/*
+ * ADC+DMA Config
+ * */
+void ADC_Config(void) {
 
-	// Some LCD demonstrations
-	LCD_clear(0);
-	switch (i++ % 7) {
-	case 0:
-		LCD_string("10x15", 0, 0, FONT_TYPE_10x15, INVERSE_TYPE_NOINVERSE);
-		break;
-	case 1:
-		LCD_string("5x8", 0, 0, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-		break;
-	case 2:
-		LCD_string("5x15", 0, 0, FONT_TYPE_5x15, INVERSE_TYPE_NOINVERSE);
-		break;
-	case 3:
-		LCD_string("10x8", 0, 0, FONT_TYPE_10x8, INVERSE_TYPE_NOINVERSE);
-		break;
-	case 4: {
-		char *string = "5x8i";
-		LCD_rect(LINE_TYPE_BLACK, ANGLE_TYPE_ROUNDED, 1, FILL_TYPE_BLACK, 8, 8,
-				tool_strlen(string) * 6 + 5, 13); //tool_strlen(string) * 6 + 5 - calculate rect width for place str
-		LCD_string("5x8i", 10, 10, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
-		break;
-	}
-	case 5:
-		LCD_rect(LINE_TYPE_BLACK, ANGLE_TYPE_RECT, 1, FILL_TYPE_TRANSPARENT, 2,
-				2, 20, 10);
-		LCD_rect(LINE_TYPE_BLACK, ANGLE_TYPE_ROUNDED, 1, FILL_TYPE_TRANSPARENT,
-				8, 8, 20, 10);
-		LCD_rect(LINE_TYPE_DOT, ANGLE_TYPE_RECT, 1, FILL_TYPE_WHITE, 14, 14, 20,
-				10);
-		LCD_rect(LINE_TYPE_BLACK, ANGLE_TYPE_RECT, 1, FILL_TYPE_GRAY, 20, 20,
-				20, 10);
-		break;
-	case 6: {
-		uint8_t j;
-		for (j = 0; j <= LCD_WIDTH; j = j + 3) {
-			LCD_line(LINE_TYPE_BLACK, j, 0, j, LCD_HEIGHT - 1);
-		}
-		break;
-	}
-	}
+}
+
+/*
+ * DAC+DMA Configure
+ * */
+void DAC_Config(void) {
+	GPIO_InitTypeDef gpio;
+	DMA_InitTypeDef dma;
+
+	/* DMA1 clock enable (to be used with DAC) */
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+
+	/* DAC Periph clock enable */
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
+
+	/* GPIOA clock enable */
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
+
+	/* Configure PA.04 (DAC_OUT1) as analog */
+	gpio.GPIO_Pin = GPIO_Pin_4;
+	gpio.GPIO_Mode = GPIO_Mode_AF;
+	gpio.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOA, &gpio);
+
+	/* DAC channel1 Configuration */
+	DAC_DeInit();
+	dac.DAC_Trigger = DAC_Trigger_T2_TRGO; //trigger by tim2
+	dac.DAC_WaveGeneration = DAC_WaveGeneration_None;
+	dac.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
+
+	/* DAC Channel1 Init */
+	DAC_Init(DAC_Channel_1, &dac);
+
+	/* Enable DAC Channel1 */
+	DAC_Cmd(DAC_Channel_1, ENABLE);
+
+	/* DMA1 channel1 configuration */
+	DMA_DeInit(DMA1_Channel3);
+	dma.DMA_PeripheralBaseAddr = DAC_DHR12R1_ADDRESS;
+	dma.DMA_MemoryBaseAddr = (uint32_t) &Sine12bit;
+	dma.DMA_DIR = DMA_DIR_PeripheralDST;
+	dma.DMA_BufferSize = DAC_POINTS;
+	dma.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+	dma.DMA_MemoryInc = DMA_MemoryInc_Enable;
+	dma.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+	dma.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+	dma.DMA_Mode = DMA_Mode_Circular;
+	dma.DMA_Priority = DMA_Priority_High;
+	dma.DMA_M2M = DMA_M2M_Disable;
+	DMA_Init(DMA1_Channel3, &dma);
+
+	/* Enable DMA1 Channel3 */
+	DMA_Cmd(DMA1_Channel3, ENABLE);
+
+	/* Enable DMA for DAC Channel2 */
+	DAC_DMACmd(DAC_Channel_1, ENABLE);
+}
+
+/*
+ * TIM2 Configure
+ * */
+void TIM2_Config(void) {
+	TIM_TimeBaseInitTypeDef tim;
+
+	/* TIM2 Periph clock enable */
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+
+	/* Time base configuration */
+	TIM_TimeBaseStructInit(&tim);
+	tim.TIM_Period = 0x1;
+	tim.TIM_Prescaler = 0x0;
+	tim.TIM_ClockDivision = 0x0;
+	tim.TIM_CounterMode = TIM_CounterMode_Up;
+	TIM_TimeBaseInit(TIM2, &tim);
+
+	/* TIM2 TRGO selection */
+	TIM_SelectOutputTrigger(TIM2, TIM_TRGOSource_Update);
+
+	/* TIM2 enable counter */
+	TIM_Cmd(TIM2, ENABLE);
+}
+
+/*
+ * Init measurements - start timer and init ADC DMA interrupt
+ * */
+void InitMeasurements(void) {
+
+}
+
+/*
+ * Stop Measurements - stop timer and DMA
+ * */
+void StopMeasurements(void) {
+
+}
+
+/*
+ * Process measurements results
+ * */
+void ProcessMeasurements(void) {
+
+}
+
+/*
+ * Update results screen
+ * */
+void UpdateResultsScreen(void) {
+
 }
 
 /**
@@ -220,6 +282,13 @@ void FreqScreenUpdate(int idx) {
 		temp[0] = 0x3e;
 	}
 	LCD_string(temp, 122, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+
+}
+
+/*
+ * Reinitialize measurements
+ * */
+void ReInitMeasurements(void) {
 
 }
 
