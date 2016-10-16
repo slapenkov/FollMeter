@@ -26,8 +26,8 @@
 
 /* Variables section */
 static float freq_set[] = { 0.00, 0.12, 0.25, 0.50, 1.00, 2.00, 4.00, 8.00,
-		16.00, 32.00, 64.00, 128.00, 256.00, 512.00, 00.00 }; //scan frequency set
-//static uint32_t tmr_set[] = {0, }
+		16.00, 31.40, 62.70, 125.60, 251.10, 502.20, 00.00 }; //scan frequency set
+static uint32_t tmr_set[] = { 0, 32150, 16070, 8035, 4017, 2008, 1002, 501, 250, 127, 63, 31, 15, 1, 0 };
 static int freq_idx = 4; //default frequency index
 
 static char strFreqPrev[6];

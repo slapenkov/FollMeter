@@ -6,8 +6,8 @@ const uint16_t Sine12bit[DAC_POINTS] = { 2048, 3251, 3995, 3996, 3253, 2051,
 
 int main(void) {
 
-	// Set up 48 MHz Core Clock using HSI (8Mhz) with PLL x 6
-	RCC_PLLConfig(RCC_PLLSource_HSI, RCC_PLLMul_6);
+	// Set up 40 MHz Core Clock using HSI (8Mhz) with PLL x 5
+	RCC_PLLConfig(RCC_PLLSource_HSI, RCC_PLLMul_5);
 	RCC_PLLCmd(ENABLE);
 
 	// Wait for PLLRDY after enabling PLL.
@@ -21,8 +21,7 @@ int main(void) {
 	LCD_init();
 
 	//Peripheral configure
-	DAC_Config();
-	TIM2_Config();
+	InitMeasurements();
 
 	/* Init STMTouch driver */
 	TSL_user_Init();
@@ -70,11 +69,11 @@ int main(void) {
 
 	//SystemTick
 	/* Setup SysTick Timer for 1 msec interrupts.*/
-	if (SysTick_Config(SystemCoreClock / 1000)) {
-		/* Capture error */
-		while (1)
-			;
-	}
+	/*if (SysTick_Config(SystemCoreClock / 1000)) {
+	 // Capture error
+	 while (1)
+	 ;
+	 }*/
 
 	//@todo debug
 	adc_buf[0] = 0;
@@ -82,6 +81,17 @@ int main(void) {
 	while (1) {
 		//@todo
 		//test for measurement ends and start math processing if needed
+		if ((DMA_GetFlagStatus(DMA1_FLAG_TC1)) == RESET) {
+			//detect adc transfer complete
+			StopMeasurements();
+			/*@todo debug*/
+			LCD_string("...processing...", 15, 0, FONT_TYPE_5x8,
+					INVERSE_TYPE_NOINVERSE); //processing message and scanner trend area
+
+			ProcessMeasurements();
+			UpdateResultsScreen();
+			InitMeasurements(); //start again
+		}
 
 		//touch keys processing
 		if (TSL_user_Action() == TSL_STATUS_OK) {
@@ -108,7 +118,7 @@ int main(void) {
 				//update screen
 				FreqScreenUpdate(freq_idx);
 				//reset measurement
-				ReInitMeasurements();
+				InitMeasurements();
 			}
 			prev_key = key; //store previous state
 		}
@@ -119,7 +129,75 @@ int main(void) {
  * ADC+DMA Config
  * */
 void ADC_Config(void) {
+	ADC_InitTypeDef ADC_InitStructure;
+	GPIO_InitTypeDef GPIO_InitStructure;
+	DMA_InitTypeDef DMA_InitStructure;
 
+	/* ADC1 DeInit */
+	ADC_DeInit(ADC1);
+
+	/* Enable ADC and GPIO clocks ****************************************/
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
+
+	/* Configure ADC1 Channel13 pin as analog input ******************************/
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+	/* Initialize ADC structure */
+	ADC_StructInit(&ADC_InitStructure);
+
+	/* Configure the ADC1 in continous mode with a resolution equal to 12 bits  */
+	ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
+	ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
+	ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
+	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_TRGO; //trigger from tim2
+	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+	ADC_InitStructure.ADC_ScanDirection = ADC_ScanDirection_Upward;
+	ADC_Init(ADC1, &ADC_InitStructure);
+
+	/* Convert the ADC1 Channel 13 with 1.5 Cycles as sampling time */
+	ADC_ChannelConfig(ADC1, ADC_Channel_13, ADC_SampleTime_1_5Cycles);
+
+	/* ADC Calibration */
+	ADC_GetCalibrationFactor(ADC1);
+
+	/* Enable DMA request after last transfer (OneShot-ADC mode) */
+	ADC_DMARequestModeConfig(ADC1, ADC_DMAMode_Circular);
+
+	/* Enable ADCperipheral[PerIdx] */
+	ADC_Cmd(ADC1, ENABLE);
+
+	/* Enable ADC_DMA */
+	ADC_DMACmd(ADC1, ENABLE);
+
+	/* Wait the ADCEN falg */
+	while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_ADRDY))
+		;
+
+	/* ADC1 regular Software Start Conv */
+	ADC_StartOfConversion(ADC1);
+
+	/* Enable DMA1 clock */
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+
+	/* DMA1 Stream1 channel1 configuration **************************************/
+	DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t) ADC1_DR_ADDRESS;
+	DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t) &adc_buf;
+	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
+	DMA_InitStructure.DMA_BufferSize = DAC_POINTS * N_SAMPLES;
+	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+	DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
+	DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+	DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
+
+	DMA_Init(DMA1_Channel1, &DMA_InitStructure);
+	DMA_Cmd(DMA1_Channel1, ENABLE);
 }
 
 /*
@@ -189,7 +267,7 @@ void TIM2_Config(void) {
 
 	/* Time base configuration */
 	TIM_TimeBaseStructInit(&tim);
-	tim.TIM_Period = 0x1;
+	tim.TIM_Period = tmr_set[freq_idx];
 	tim.TIM_Prescaler = 0x0;
 	tim.TIM_ClockDivision = 0x0;
 	tim.TIM_CounterMode = TIM_CounterMode_Up;
@@ -206,7 +284,9 @@ void TIM2_Config(void) {
  * Init measurements - start timer and init ADC DMA interrupt
  * */
 void InitMeasurements(void) {
-
+	DAC_Config();
+	ADC_Config();
+	TIM2_Config();
 }
 
 /*
@@ -282,13 +362,6 @@ void FreqScreenUpdate(int idx) {
 		temp[0] = 0x3e;
 	}
 	LCD_string(temp, 122, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-
-}
-
-/*
- * Reinitialize measurements
- * */
-void ReInitMeasurements(void) {
 
 }
 
