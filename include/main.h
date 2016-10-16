@@ -48,7 +48,7 @@ static uint16_t adc_buf[DAC_POINTS * N_SAMPLES];
 /* Private variables ---------------------------------------------------------*/
 static __IO uint32_t TimingDelay;
 
-//uint8_t i = 0;
+static int i = 0;
 
 DAC_InitTypeDef dac;
 

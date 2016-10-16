@@ -75,22 +75,20 @@ int main(void) {
 	 ;
 	 }*/
 
-	//@todo debug
-	adc_buf[0] = 0;
-
 	while (1) {
 		//@todo
 		//test for measurement ends and start math processing if needed
-		if ((DMA_GetFlagStatus(DMA1_FLAG_TC1)) == RESET) {
+		if ((DMA_GetFlagStatus(DMA1_FLAG_TC1)) == SET) {
 			//detect adc transfer complete
 			StopMeasurements();
-			/*@todo debug*/
-			LCD_string("...processing...", 15, 0, FONT_TYPE_5x8,
-					INVERSE_TYPE_NOINVERSE); //processing message and scanner trend area
-
 			ProcessMeasurements();
 			UpdateResultsScreen();
 			InitMeasurements(); //start again
+
+			/* Clear DMA TC flag */
+			DMA_ClearFlag(DMA1_FLAG_TC1);
+		} else if ((DMA_GetFlagStatus(DMA1_FLAG_TE1)) == SET) {
+			LCD_string("error", 0, 0, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE); //processing message and scanner trend area
 		}
 
 		//touch keys processing
@@ -293,7 +291,8 @@ void InitMeasurements(void) {
  * Stop Measurements - stop timer and DMA
  * */
 void StopMeasurements(void) {
-
+	/* TIM2 disable counter */
+	TIM_Cmd(TIM2, DISABLE);
 }
 
 /*
