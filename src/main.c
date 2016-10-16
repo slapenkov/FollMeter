@@ -4,6 +4,9 @@
 const uint16_t Sine12bit[DAC_POINTS] = { 2048, 3251, 3995, 3996, 3253, 2051,
 		847, 101, 98, 839 };
 
+const float dcos[DAC_POINTS] = { 1, 1, 0, -1, -1, -1, -1, 0, 1, 1 };
+const float dsin[DAC_POINTS] = { 0, 1, 1, 1, 1, 0, -1, -1, -1, -1 };
+
 int main(void) {
 
 	// Set up 40 MHz Core Clock using HSI (8Mhz) with PLL x 5
@@ -35,9 +38,6 @@ int main(void) {
 	LCD_string("Dnipro 2016", 30, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string("Loading,please wait...", 0, 0, FONT_TYPE_5x8,
 			INVERSE_TYPE_NOINVERSE);
-
-	//math prepeare section
-	//@todo add initialization
 
 	//main interface section
 	sprintf(strFreqPrev, "%06.2f", freq_set[freq_idx - 1]);
@@ -297,16 +297,51 @@ void StopMeasurements(void) {
 
 /*
  * Process measurements results
- * */
+ * @todo */
 void ProcessMeasurements(void) {
+	//clear sum buffer
+	for (int i = 0; i < DAC_POINTS; i++) {
+		sum_buf[i] = 0;
+	}
+	//scan adc buffer and add corresponds to sum buffer
+	for (int i = 0; i < (DAC_POINTS * N_SAMPLES); i++) {
+		sum_buf[i % DAC_POINTS] += (float) adc_buf[i];
+	}
+	//averaging and @todo scaling
+	for (int i = 0; i < DAC_POINTS; i++) {
+		sum_buf[i] /= N_SAMPLES;
+	}
+	//combining with test samples for d1 and d2
+	d1 = 0;
+	d2 = 0;
 
+	for (int i = 0; i < DAC_POINTS; i++) {
+		d1 += dcos[i] * sum_buf[i];
+		d2 += dsin[i] * sum_buf[i];
+	}
+
+	//amplitude and phase
+	amplitude = M_PI_2 * sqrt(d1 * d1 + d2 * d2);
+	phase = -atan2(d2, d1);
 }
 
 /*
  * Update results screen
  * */
 void UpdateResultsScreen(void) {
-
+	char temp[] = "";
+	//read part
+	sprintf(temp, "%09.3f", d1);
+	LCD_string(temp, 74, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	//imagine part
+	sprintf(temp, "%09.3f", d2);
+	LCD_string(temp, 74, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	//ampl
+	sprintf(temp, "%09.3f", amplitude);
+	LCD_string(temp, 74, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	//phase
+	sprintf(temp, "%09.3f", phase);
+	LCD_string(temp, 74, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 }
 
 /**
@@ -390,8 +425,6 @@ void MyLinRots_ErrorStateProcess(void) {
 	/* Add here your own processing when a sensor is in Error state */
 	TSL_linrot_SetStateOff();
 	while (1) {
-		/* Insert 1s delay */
-		Delay(100);
 	}
 }
 
