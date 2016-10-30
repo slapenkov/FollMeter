@@ -4,8 +4,8 @@
 const uint16_t Sine12bit[DAC_POINTS] = { 2048, 3251, 3995, 3996, 3253, 2051,
 		847, 101, 98, 839 };
 
-const float dcos[DAC_POINTS] = { 1, 1, 0, -1, -1, -1, -1, 0, 1, 1 };
-const float dsin[DAC_POINTS] = { 0, 1, 1, 1, 1, 0, -1, -1, -1, -1 };
+const float dcos[DAC_POINTS] = { 1, 1, 1, -1, -1, -1, -1, -1, 1, 1 };
+const float dsin[DAC_POINTS] = { 1, 1, 1, 1, 1, -1, -1, -1, -1, -1 };
 
 int main(void) {
 
@@ -23,9 +23,6 @@ int main(void) {
 	//LCD init
 	LCD_init();
 
-	/* Init STMTouch driver */
-	TSL_user_Init();
-
 	//preload section
 	LCD_string("Impedance scanner", 15, 56, FONT_TYPE_5x8,
 			INVERSE_TYPE_NOINVERSE);
@@ -35,6 +32,9 @@ int main(void) {
 	LCD_string("Dnipro 2016", 30, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string("Loading,please wait...", 0, 0, FONT_TYPE_5x8,
 			INVERSE_TYPE_NOINVERSE);
+
+	//wait
+	tool_delay_ms(3000);
 
 	//main interface section
 	sprintf(strFreqPrev, "%06.2f", freq_set[freq_idx - 1]);
@@ -50,53 +50,56 @@ int main(void) {
 
 	LCD_line(LINE_TYPE_DOT, 0, 52, 127, 52);
 
-	LCD_string("Re{Z},Ohms =", 0, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	LCD_string("333.34R", 75, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	LCD_string("Im{Z},Ohms =", 0, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	LCD_string("100.00K", 75, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	LCD_string("Ampl.,Ohms =", 0, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	LCD_string("670.22", 75, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	LCD_string("Phase,rad  =", 0, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE); //phase
-	LCD_string("000.12", 75, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("  g,uSm:", 0, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("***.***", 50, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("  b,uSm:", 0, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("***.***", 50, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("|Y|,uSm:", 0, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("***.***", 50, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string("Phi,rad:", 0, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE); //phase
+	LCD_string("***.***", 50, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 
 	LCD_line(LINE_TYPE_DOT, 0, 12, 127, 12);
 
 	LCD_string("...processing...", 15, 0, FONT_TYPE_5x8,
 			INVERSE_TYPE_NOINVERSE); //processing message and scanner trend area
 
+	/* Init STMTouch driver */
+	//TSL_user_Init();
 	//Peripheral configure
+	adcRdy = 0;
 	InitMeasurements();
 
 	while (1) {
 		//touch keys processing
-		if (TSL_user_Action() == TSL_STATUS_OK) {
-			ProcessSensors(); // Execute sensors related tasks
-			//process key code action
-			if ((prev_key == 0) & (key != 0)) {
-				//key pressed detected
-				switch (key) {
-				case FIRST_KEY:
-					freq_idx--;
-					if (freq_idx == 0)
-						freq_idx++;
-					break;
-				case SECOND_KEY:
-					break;
-				case THIRD_KEY:
-					break;
-				case FOURTH_KEY:
-					freq_idx++;
-					if (freq_idx + 1 == sizeof(freq_set) / sizeof(float))
-						freq_idx--;
-					break;
-				}
-				//update screen
-				FreqScreenUpdate(freq_idx);
-				//reset measurement
-				InitMeasurements();
-			}
-			prev_key = key; //store previous state
-		}
+		/*if (TSL_user_Action() == TSL_STATUS_OK) {
+		 ProcessSensors(); // Execute sensors related tasks
+		 //process key code action
+		 if ((prev_key == 0) & (key != 0)) {
+		 //key pressed detected
+		 switch (key) {
+		 case FIRST_KEY:
+		 freq_idx--;
+		 if (freq_idx == 0)
+		 freq_idx++;
+		 break;
+		 case SECOND_KEY:
+		 break;
+		 case THIRD_KEY:
+		 break;
+		 case FOURTH_KEY:
+		 freq_idx++;
+		 if (freq_idx + 1 == sizeof(freq_set) / sizeof(float))
+		 freq_idx--;
+		 break;
+		 }
+		 //update screen
+		 FreqScreenUpdate(freq_idx);
+		 //reset measurement
+		 InitMeasurements();
+		 }
+		 prev_key = key; //store previous state
+		 }*/
 	} // Infinity loop
 }
 
@@ -115,46 +118,52 @@ void ADC_Config(void) {
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
 
+	/* Enable DMA1 clock */
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+
 	/* Configure ADC1 Channel13 pin as analog input ******************************/
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
 	/* Initialize ADC structure */
 	ADC_StructInit(&ADC_InitStructure);
 
 	/* Configure the ADC1 in continous mode with a resolution equal to 12 bits  */
-	ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-	ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
+	ADC_InitStructure.ADC_Resolution = ADC_Resolution_8b;
+	ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
 	ADC_InitStructure.ADC_ExternalTrigConvEdge =
-	ADC_ExternalTrigConvEdge_None;
+	ADC_ExternalTrigConvEdge_Rising;
 	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_TRGO; //trigger from tim2
 	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-	ADC_InitStructure.ADC_ScanDirection = ADC_ScanDirection_Backward;
+	ADC_InitStructure.ADC_ScanDirection = ADC_ScanDirection_Upward;
 	ADC_Init(ADC1, &ADC_InitStructure);
-
-	/* Convert the ADC1 Channel 13 with 1.5 Cycles as sampling time */
-	ADC_ChannelConfig(ADC1, ADC_Channel_13, ADC_SampleTime_1_5Cycles);
 
 	/* ADC Calibration */
 	ADC_GetCalibrationFactor(ADC1);
 
-	/* Enable DMA request after last transfer (OneShot-ADC mode) */
-	ADC_DMARequestModeConfig(ADC1, ADC_DMAMode_Circular);
+	/* Convert the ADC1 Channel 13 with 1.5 Cycles as sampling time */
+	ADC_ChannelConfig(ADC1, ADC_Channel_13, ADC_SampleTime_1_5Cycles); //@todo
 
+	/* Enable DMA request after last transfer (OneShot-ADC mode) */
+	//ADC_DMARequestModeConfig(ADC1, ADC_DMAMode_Circular);
 	/* Enable ADCperipheral[PerIdx] */
 	ADC_Cmd(ADC1, ENABLE);
 
 	/* Enable ADC_DMA */
 	ADC_DMACmd(ADC1, ENABLE);
 
-	/* Enable DMA1 clock */
-	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+	/* Wait the ADCEN falg */
+	while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_ADRDY))
+		;
+	/* ADC1 regular Software Start Conv */
+	ADC_StartOfConversion(ADC1);
 
 	/* DMA1 Stream1 channel1 configuration **************************************/
 	DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t) ADC1_DR_ADDRESS;
-	DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t) &adc_buf[0];
+	DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t) &adc_buf;
 	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
 	DMA_InitStructure.DMA_BufferSize = sizeof(adc_buf) / sizeof(uint16_t);
 	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
@@ -162,10 +171,11 @@ void ADC_Config(void) {
 	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
 	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
 	DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
-	DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+	DMA_InitStructure.DMA_Priority = DMA_Priority_VeryHigh;
 	DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
 
 	DMA_Init(DMA1_Channel1, &DMA_InitStructure);
+
 	// Enable DMA1 Channel Transfer Complete interrupt
 	DMA_ITConfig(DMA1_Channel1, DMA_IT_TC, ENABLE);
 	DMA_Cmd(DMA1_Channel1, ENABLE);
@@ -177,9 +187,6 @@ void ADC_Config(void) {
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
-	/* Wait the ADCEN falg */
-	while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_ADRDY))
-		;
 	/* ADC1 regular Software Start Conv */
 	ADC_StartOfConversion(ADC1);
 }
@@ -229,7 +236,7 @@ void DAC_Config(void) {
 	dma.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
 	dma.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
 	dma.DMA_Mode = DMA_Mode_Circular;
-	dma.DMA_Priority = DMA_Priority_Medium;
+	dma.DMA_Priority = DMA_Priority_High;
 	dma.DMA_M2M = DMA_M2M_Disable;
 	DMA_Init(DMA1_Channel3, &dma);
 
@@ -247,7 +254,6 @@ void TIM2_Config(void) {
 	TIM_TimeBaseInitTypeDef tim;
 
 	/* TIM2 Periph clock enable */
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, DISABLE);
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
 	/* Time base configuration */
@@ -275,16 +281,6 @@ void InitMeasurements(void) {
 }
 
 /*
- * Stop Measurements - stop timer and DMA
- * */
-void StopMeasurements(void) {
-	/* TIM2 disable counter */
-	TIM_Cmd(TIM2, DISABLE);
-	DAC_Cmd(DAC_Channel_1, DISABLE);
-	ADC_Cmd(ADC1, DISABLE);
-}
-
-/*
  * Process measurements results
  * @todo */
 void ProcessMeasurements(void) {
@@ -294,11 +290,11 @@ void ProcessMeasurements(void) {
 	}
 	//scan adc buffer and add corresponds to sum buffer
 	for (int i = 0; i < (DAC_POINTS * N_SAMPLES); i++) {
-		sum_buf[i % DAC_POINTS] += (3.3 * ((float) adc_buf[i]) / 4096);
+		sum_buf[i % DAC_POINTS] += (1.0 * ((float) (adc_buf[i] - 128)) / 256);
 	}
-	//averaging and @todo scaling
+	//averaging
 	for (int i = 0; i < DAC_POINTS; i++) {
-		sum_buf[i] /= N_SAMPLES;
+		sum_buf[i] = -sum_buf[i] / (N_SAMPLES * FB_RESISTOR);
 	}
 	//combining with test samples for d1 and d2
 	d1 = 0;
@@ -309,8 +305,11 @@ void ProcessMeasurements(void) {
 		d2 += dsin[i] * sum_buf[i];
 	}
 
+	d1 /= DAC_POINTS;
+	d2 /= DAC_POINTS;
+
 	//amplitude and phase
-	amplitude = M_PI_2 * sqrt(d1 * d1 + d2 * d2);
+	amplitude = sqrt(d1 * d1 + d2 * d2);
 	phase = -atan2(d2, d1);
 }
 
@@ -319,7 +318,7 @@ void ProcessMeasurements(void) {
  * */
 void UpdateResultsScreen(void) {
 	char temp[] = "";
-	//read part
+	//real part
 	sprintf(temp, "%09.3f", d1);
 	LCD_string(temp, 74, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	//imagine part
@@ -437,5 +436,59 @@ void Delay(__IO uint32_t nTime) {
 void TimingDelay_Decrement(void) {
 	if (TimingDelay != 0x00) {
 		TimingDelay--;
+	}
+}
+
+/*
+ * DMA ISR process
+ * */
+void DMA_ISR(void) {
+	if (DMA_GetITStatus(DMA1_IT_TC1)) {
+		DMA_Cmd(DMA1_Channel1, DISABLE);
+		DMA_Cmd(DMA1_Channel3, DISABLE);
+		char temp[] = "";
+		/*sprintf(temp, "Remains %i     ", DMA_GetCurrDataCounter(DMA1_Channel1));
+		 LCD_string(temp, 0, 0, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE); //processing message and scanner trend area*/
+		DMA_SetCurrDataCounter(DMA1_Channel1, DAC_POINTS * N_SAMPLES);
+		DMA_SetCurrDataCounter(DMA1_Channel3, DAC_POINTS);
+		ProcessMeasurements();
+		//LCD_clear(0);
+		//real part
+		sprintf(temp, "%07.3f", d1);
+		LCD_string(temp, 49, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+		//imagine part
+		sprintf(temp, "%07.3f", d2);
+		LCD_string(temp, 49, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+		//ampl
+		sprintf(temp, "%07.3f", amplitude);
+		LCD_string(temp, 49, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+		//phase
+		sprintf(temp, "%07.3f", phase);
+		LCD_string(temp, 49, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+		//prepare draw area
+		LCD_string("      ", 94, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+		LCD_string("      ", 94, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+		LCD_string("      ", 94, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+		LCD_string("      ", 94, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+		//signal draw
+		uint8_t x = 94, y, xp, yp;
+		xp = x;
+		yp = (uint8_t) (64 * sum_buf[0] / 10) + 32;
+		for (uint8_t i = 1; i < 10; i++) {
+			x += 3;
+			y = (uint8_t) (64 * sum_buf[i] / 10) + 32;
+			y = (y > 48) ? 48 : y;
+			y = (y < 15) ? 15 : y;
+			LCD_line(LINE_TYPE_BLACK, xp, yp, x, y);
+			xp = x;
+			yp = y;
+		}
+
+		DMA_Cmd(DMA1_Channel1, ENABLE);
+		DMA_Cmd(DMA1_Channel3, ENABLE);
+		/* Clear DMA TC flag */
+		DMA_ClearITPendingBit(DMA1_IT_GL1);
+		/* ADC1 regular Software Start Conv */
+		ADC_StartOfConversion(ADC1);
 	}
 }

@@ -25,12 +25,14 @@
 #define DAC_POINTS 10
 #define N_SAMPLES 100
 
+#define FB_RESISTOR 0.2 //in MOhms
+
 /* Variables section */
 static double freq_set[] = { 0.00, 0.12, 0.25, 0.50, 1.00, 2.00, 4.00, 8.00,
 		16.00, 31.40, 62.70, 125.60, 251.10, 502.20, 00.00 }; //scan frequency set
 static uint32_t tmr_set[] = { 0, 32150, 16070, 8035, 4017, 2008, 1002, 501, 250,
 		127, 63, 31, 15, 1, 0 };
-static int freq_idx = 7; //default frequency index
+static int freq_idx = 5; //default frequency index
 
 static char strFreqPrev[6];
 static char strFreqSel[6];
@@ -38,6 +40,8 @@ static char strFreqNext[6];
 
 static int key = 0;
 static int prev_key = 0;
+
+static __IO uint32_t adcRdy;
 
 enum {
 	FIRST_KEY = 1, SECOND_KEY, THIRD_KEY, FOURTH_KEY
@@ -65,8 +69,8 @@ void TIM2_Config(void);
 void ProcessSensors(void);
 void FreqScreenUpdate(int idx);
 void InitMeasurements(void);
-void StopMeasurements(void);
 void ProcessMeasurements(void);
 void UpdateResultsScreen(void);
+void DMA_ISR(void);
 
 #endif /* INCLUDE_MAIN_H_ */

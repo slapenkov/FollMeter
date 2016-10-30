@@ -113,7 +113,7 @@ void USB_IRQHandler(void) {
 void TSC_IRQHandler(void) {
 #if TSLPRM_TSC_IODEF > 0 // Default = Input Floating
 	/* Set IO default in Output PP Low to discharge all capacitors */
-	TSC->CR &= (uint32_t)(~(1 << 4));
+	TSC->CR &= (uint32_t) (~(1 << 4));
 #endif
 	TSC->ICR |= 0x03; /* Clear EOAF and MCEF flags */
 	Gv_EOA = 1; /* To inform the main loop routine of the End Of Acquisition */
@@ -124,18 +124,7 @@ void TSC_IRQHandler(void) {
  * @retval None
  */
 void DMA1_Channel1_IRQHandler(void) {
-	NVIC_DisableIRQ(DMA1_Channel1_IRQn);
-	if (DMA_GetITStatus(DMA1_IT_TC1)) {
-		StopMeasurements();
-		char temp[] = "";
-		sprintf(temp, "Remains %i     ", DMA_GetCurrDataCounter(DMA1_Channel1));
-		LCD_string(temp, 0, 0, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE); //processing message and scanner trend area
-		ProcessMeasurements();
-		UpdateResultsScreen();
-		/* Clear DMA TC flag */
-		DMA_ClearITPendingBit(DMA1_IT_GL1);
-		InitMeasurements(); //start again
-	}
+	DMA_ISR();
 }
 
 /**
