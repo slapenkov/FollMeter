@@ -13,8 +13,8 @@
 #include "stm32f0xx.h"
 #include "uc1601s.h"
 #include "tools.h"
-#include "tsl_types.h"
-#include "tsl_user.h"
+//#include "tsl_types.h"
+//#include "tsl_user.h"
 #include "math.h"
 
 /* Defines section */
@@ -68,6 +68,7 @@ void DAC_Config(void);
 void TIM2_Config(void);
 void ProcessSensors(void);
 void FreqScreenUpdate(int idx);
+void InitControls(void);
 void InitMeasurements(void);
 void ProcessMeasurements(void);
 void UpdateResultsScreen(void);

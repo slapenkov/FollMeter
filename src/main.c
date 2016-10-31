@@ -67,39 +67,51 @@ int main(void) {
 	/* Init STMTouch driver */
 	//TSL_user_Init();
 	//Peripheral configure
-	adcRdy = 0;
+	InitControls();
 	InitMeasurements();
 
 	while (1) {
-		//touch keys processing
-		/*if (TSL_user_Action() == TSL_STATUS_OK) {
-		 ProcessSensors(); // Execute sensors related tasks
-		 //process key code action
-		 if ((prev_key == 0) & (key != 0)) {
-		 //key pressed detected
-		 switch (key) {
-		 case FIRST_KEY:
-		 freq_idx--;
-		 if (freq_idx == 0)
-		 freq_idx++;
-		 break;
-		 case SECOND_KEY:
-		 break;
-		 case THIRD_KEY:
-		 break;
-		 case FOURTH_KEY:
-		 freq_idx++;
-		 if (freq_idx + 1 == sizeof(freq_set) / sizeof(float))
-		 freq_idx--;
-		 break;
-		 }
-		 //update screen
-		 FreqScreenUpdate(freq_idx);
-		 //reset measurement
-		 InitMeasurements();
-		 }
-		 prev_key = key; //store previous state
-		 }*/
+		//keys processing
+		ProcessSensors();
+		//process key code action
+		if ((prev_key == 0) & (key != 0)) {
+			//key pressed detected
+			switch (key) {
+			case FIRST_KEY:
+				freq_idx--;
+				if (freq_idx == 0)
+					freq_idx++;
+				break;
+			case SECOND_KEY:
+				break;
+			case THIRD_KEY:
+				break;
+			case FOURTH_KEY:
+				freq_idx++;
+				if (freq_idx + 1 == sizeof(freq_set) / sizeof(float))
+					freq_idx--;
+				break;
+			}
+			DMA_Cmd(DMA1_Channel1, DISABLE);
+			DMA_Cmd(DMA1_Channel3, DISABLE);
+			DMA_SetCurrDataCounter(DMA1_Channel1, DAC_POINTS * N_SAMPLES);
+			DMA_SetCurrDataCounter(DMA1_Channel3, DAC_POINTS);
+			//
+			TIM2_Config();
+
+			//update screen
+			FreqScreenUpdate(freq_idx);
+			//reset measurement @todo
+			DMA_Cmd(DMA1_Channel1, ENABLE);
+			DMA_Cmd(DMA1_Channel3, ENABLE);
+			/* Clear DMA TC flag */
+			DMA_ClearITPendingBit(DMA1_IT_GL1);
+			/* ADC1 regular Software Start Conv */
+			ADC_StartOfConversion(ADC1);
+
+		}
+		prev_key = key; //store previous state
+
 	} // Infinity loop
 }
 
@@ -145,7 +157,7 @@ void ADC_Config(void) {
 	ADC_GetCalibrationFactor(ADC1);
 
 	/* Convert the ADC1 Channel 13 with 1.5 Cycles as sampling time */
-	ADC_ChannelConfig(ADC1, ADC_Channel_13, ADC_SampleTime_1_5Cycles); //@todo
+	ADC_ChannelConfig(ADC1, ADC_Channel_13, ADC_SampleTime_1_5Cycles); //
 
 	/* Enable DMA request after last transfer (OneShot-ADC mode) */
 	//ADC_DMARequestModeConfig(ADC1, ADC_DMAMode_Circular);
@@ -272,6 +284,24 @@ void TIM2_Config(void) {
 }
 
 /*
+ * Init controls
+ * */
+void InitControls() {
+	GPIO_InitTypeDef gpio;
+
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA | RCC_AHBPeriph_GPIOC, ENABLE); //enable port a and c clock
+
+	gpio.GPIO_Pin = GPIO_Pin_7 | GPIO_Pin_8 | GPIO_Pin_9;
+	gpio.GPIO_Mode = GPIO_Mode_IN;
+	gpio.GPIO_PuPd = GPIO_PuPd_UP;
+	gpio.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOC, &gpio);
+
+	gpio.GPIO_Pin = GPIO_Pin_8;
+	GPIO_Init(GPIOA, &gpio);
+}
+
+/*
  * Init measurements - start timer and init ADC DMA interrupt
  * */
 void InitMeasurements(void) {
@@ -339,25 +369,15 @@ void UpdateResultsScreen(void) {
  */
 void ProcessSensors(void) {
 	key = 0;
-	if ((MyLinRots[0].p_Data->StateId == TSL_STATEID_DETECT)
-			|| (MyLinRots[0].p_Data->StateId == TSL_STATEID_DEB_RELEASE_DETECT)) {
+	if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_7) == Bit_RESET)
+		key = FOURTH_KEY;
+	if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_8) == Bit_RESET)
+		key = FIRST_KEY;
+	if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_9) == Bit_RESET)
+		key = THIRD_KEY;
+	if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_8) == Bit_RESET)
+		key = SECOND_KEY;
 
-		if (MyLinRots[0].p_Data->Position > 0) {
-			key = FIRST_KEY;
-		}
-
-		if (MyLinRots[0].p_Data->Position >= 48) {
-			key = SECOND_KEY;
-		}
-
-		if (MyLinRots[0].p_Data->Position >= 80) {
-			key = THIRD_KEY;
-		}
-
-		if (MyLinRots[0].p_Data->Position >= 112) {
-			key = FOURTH_KEY;
-		}
-	}
 }
 
 /*
@@ -366,12 +386,12 @@ void ProcessSensors(void) {
 void FreqScreenUpdate(int idx) {
 	char temp[] = { 0x20 };
 
-	//prepare strings
+//prepare strings
 	sprintf(strFreqPrev, "%06.2f", freq_set[freq_idx - 1]);
 	sprintf(strFreqSel, "%06.2f", freq_set[freq_idx]);
 	sprintf(strFreqNext, "%06.2f", freq_set[freq_idx + 1]);
 
-	//redraw screen
+//redraw screen
 	if ((idx - 1) > 0) {
 		temp[0] = 0x3c;
 	}
@@ -409,12 +429,11 @@ void TSL_CallBack_TimerTick(void) {
  * @param  None
  * @retval None
  */
-void MyLinRots_ErrorStateProcess(void) {
-	/* Add here your own processing when a sensor is in Error state */
-	TSL_linrot_SetStateOff();
-	while (1) {
-	}
-}
+/*void MyLinRots_ErrorStateProcess(void) {
+ TSL_linrot_SetStateOff();
+ while (1) {
+ }
+ }*/
 
 /**
  * @brief  Inserts a delay time.
@@ -452,25 +471,25 @@ void DMA_ISR(void) {
 		DMA_SetCurrDataCounter(DMA1_Channel1, DAC_POINTS * N_SAMPLES);
 		DMA_SetCurrDataCounter(DMA1_Channel3, DAC_POINTS);
 		ProcessMeasurements();
-		//LCD_clear(0);
-		//real part
+//LCD_clear(0);
+//real part
 		sprintf(temp, "%07.3f", d1);
 		LCD_string(temp, 49, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-		//imagine part
+//imagine part
 		sprintf(temp, "%07.3f", d2);
 		LCD_string(temp, 49, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-		//ampl
+//ampl
 		sprintf(temp, "%07.3f", amplitude);
 		LCD_string(temp, 49, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-		//phase
+//phase
 		sprintf(temp, "%07.3f", phase);
 		LCD_string(temp, 49, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-		//prepare draw area
+//prepare draw area
 		LCD_string("      ", 94, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 		LCD_string("      ", 94, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 		LCD_string("      ", 94, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 		LCD_string("      ", 94, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-		//signal draw
+//signal draw
 		uint8_t x = 94, y, xp, yp;
 		xp = x;
 		yp = (uint8_t) (64 * sum_buf[0] / 10) + 32;
