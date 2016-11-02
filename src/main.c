@@ -1,8 +1,8 @@
 #include "main.h"
 
 /* Consts */
-const uint16_t Sine12bit[DAC_POINTS] = { 2048, 3251, 3995, 3996, 3253, 2051,
-		847, 101, 98, 839 };
+const uint16_t Sine12bit_template[DAC_POINTS] = { 2048, 3251, 3995, 3996, 3253,
+		2051, 847, 101, 98, 839 };
 
 const float dcos[DAC_POINTS] = { 1, 1, 1, -1, -1, -1, -1, -1, 1, 1 };
 const float dsin[DAC_POINTS] = { 1, 1, 1, 1, 1, -1, -1, -1, -1, -1 };
@@ -44,8 +44,8 @@ int main(void) {
 	LCD_clear(0);
 	LCD_string("<", 0, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string(strFreqPrev, 5, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	LCD_string(strFreqSel, 48, 56, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
-	LCD_string(strFreqNext, 92, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string(strFreqSel, 45, 56, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
+	LCD_string(strFreqNext, 87, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string(">", 122, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 
 	LCD_line(LINE_TYPE_DOT, 0, 52, 127, 52);
@@ -61,8 +61,7 @@ int main(void) {
 
 	LCD_line(LINE_TYPE_DOT, 0, 12, 127, 12);
 
-	LCD_string("...processing...", 15, 0, FONT_TYPE_5x8,
-			INVERSE_TYPE_NOINVERSE); //processing message and scanner trend area
+	LCD_string("1/1", 45, 0, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
 
 	/* Init STMTouch driver */
 	//TSL_user_Init();
@@ -78,29 +77,32 @@ int main(void) {
 			//key pressed detected
 			switch (key) {
 			case FIRST_KEY:
-				freq_idx--;
-				if (freq_idx == 0)
-					freq_idx++;
+				if (freq_idx > 1)
+					freq_idx--;
 				break;
 			case SECOND_KEY:
+				if (presc_idx > 0)
+					presc_idx--;
 				break;
 			case THIRD_KEY:
+				if (presc_idx < (sizeof(presc_set) / sizeof(int)) - 1)
+					presc_idx++;
 				break;
 			case FOURTH_KEY:
-				freq_idx++;
-				if (freq_idx + 1 == sizeof(freq_set) / sizeof(float))
-					freq_idx--;
+				if (freq_idx < (sizeof(freq_set) / sizeof(double)) - 2)
+					freq_idx++;
 				break;
 			}
 			DMA_Cmd(DMA1_Channel1, DISABLE);
 			DMA_Cmd(DMA1_Channel3, DISABLE);
+			SineUpdate(presc_set[presc_idx]);
 			DMA_SetCurrDataCounter(DMA1_Channel1, DAC_POINTS * N_SAMPLES);
 			DMA_SetCurrDataCounter(DMA1_Channel3, DAC_POINTS);
 			//
 			TIM2_Config();
 
 			//update screen
-			FreqScreenUpdate(freq_idx);
+			ScreenUpdate();
 			//reset measurement @todo
 			DMA_Cmd(DMA1_Channel1, ENABLE);
 			DMA_Cmd(DMA1_Channel3, ENABLE);
@@ -144,7 +146,7 @@ void ADC_Config(void) {
 	ADC_StructInit(&ADC_InitStructure);
 
 	/* Configure the ADC1 in continous mode with a resolution equal to 12 bits  */
-	ADC_InitStructure.ADC_Resolution = ADC_Resolution_8b;
+	ADC_InitStructure.ADC_Resolution = ADC_Resolution_10b;
 	ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
 	ADC_InitStructure.ADC_ExternalTrigConvEdge =
 	ADC_ExternalTrigConvEdge_Rising;
@@ -305,6 +307,7 @@ void InitControls() {
  * Init measurements - start timer and init ADC DMA interrupt
  * */
 void InitMeasurements(void) {
+	SineUpdate(presc_set[presc_idx]);
 	TIM2_Config();
 	DAC_Config();
 	ADC_Config();
@@ -320,25 +323,26 @@ void ProcessMeasurements(void) {
 	}
 	//scan adc buffer and add corresponds to sum buffer
 	for (int i = 0; i < (DAC_POINTS * N_SAMPLES); i++) {
-		sum_buf[i % DAC_POINTS] += (1.0 * ((float) (adc_buf[i] - 128)) / 256);
+		sum_buf[i % DAC_POINTS] += (1.62
+				* (((double) (adc_buf[i]) / 1024) - 0.5)); //momentary voltage
 	}
-	//averaging
+//averaging and convert to current
 	for (int i = 0; i < DAC_POINTS; i++) {
-		sum_buf[i] = -sum_buf[i] / (N_SAMPLES * FB_RESISTOR);
+		sum_buf[i] = sum_buf[i] / (N_SAMPLES);
 	}
-	//combining with test samples for d1 and d2
+//combining with test samples for d1 and d2
 	d1 = 0;
 	d2 = 0;
 
 	for (int i = 0; i < DAC_POINTS; i++) {
-		d1 += dcos[i] * sum_buf[i];
-		d2 += dsin[i] * sum_buf[i];
+		d1 += dsin[i] * sum_buf[i];
+		d2 += dcos[i] * sum_buf[i];
 	}
 
-	d1 /= DAC_POINTS;
-	d2 /= DAC_POINTS;
+	d1 *= presc_set[presc_idx];
+	d2 *= presc_set[presc_idx];
 
-	//amplitude and phase
+//amplitude and phase
 	amplitude = sqrt(d1 * d1 + d2 * d2);
 	phase = -atan2(d2, d1);
 }
@@ -348,16 +352,16 @@ void ProcessMeasurements(void) {
  * */
 void UpdateResultsScreen(void) {
 	char temp[] = "";
-	//real part
+//real part
 	sprintf(temp, "%09.3f", d1);
 	LCD_string(temp, 74, 40, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	//imagine part
+//imagine part
 	sprintf(temp, "%09.3f", d2);
 	LCD_string(temp, 74, 32, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	//ampl
+//ampl
 	sprintf(temp, "%09.3f", amplitude);
 	LCD_string(temp, 74, 24, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	//phase
+//phase
 	sprintf(temp, "%09.3f", phase);
 	LCD_string(temp, 74, 16, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 }
@@ -374,16 +378,16 @@ void ProcessSensors(void) {
 	if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_8) == Bit_RESET)
 		key = FIRST_KEY;
 	if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_9) == Bit_RESET)
-		key = THIRD_KEY;
-	if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_8) == Bit_RESET)
 		key = SECOND_KEY;
+	if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_8) == Bit_RESET)
+		key = THIRD_KEY;
 
 }
 
 /*
- * Frequency screen update by index
+ * Frequency and prescaler screen update by index
  * */
-void FreqScreenUpdate(int idx) {
+void ScreenUpdate(void) {
 	char temp[] = { 0x20 };
 
 //prepare strings
@@ -392,48 +396,33 @@ void FreqScreenUpdate(int idx) {
 	sprintf(strFreqNext, "%06.2f", freq_set[freq_idx + 1]);
 
 //redraw screen
-	if ((idx - 1) > 0) {
+	if ((freq_idx - 1) > 0) {
 		temp[0] = 0x3c;
 	}
 	LCD_string(temp, 0, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	LCD_string(strFreqPrev, 5, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
-	LCD_string(strFreqSel, 48, 56, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
-	LCD_string(strFreqNext, 92, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+	LCD_string(strFreqSel, 45, 56, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
+	LCD_string(strFreqNext, 87, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
 	temp[0] = 0x20;
-	if ((idx + 2) < sizeof(freq_set) / sizeof(float)) {
+	if ((freq_idx + 2) < sizeof(freq_set) / sizeof(double)) {
 		temp[0] = 0x3e;
 	}
 	LCD_string(temp, 122, 56, FONT_TYPE_5x8, INVERSE_TYPE_NOINVERSE);
+//prescaler
+	sprintf(temp, "1/%i", presc_set[presc_idx]);
+	LCD_string(temp, 45, 0, FONT_TYPE_5x8, INVERSE_TYPE_INVERSE);
 
 }
 
-/**
- * @brief  Executed when a sensor is in Off state
- * @param  None
- * @retval None
- */
-void MyLinRots_OffStateProcess(void) {
-	/* Add here your own processing when a sensor is in Off state */
+/*
+ * Sine set update
+ * */
+void SineUpdate(int presc) {
+	for (int i = 0; i < DAC_POINTS; i++) {
+		Sine12bit[i] = (uint16_t) (((Sine12bit_template[i] - 2048) / presc)
+				+ 2048);
+	}
 }
-
-/**
- * @brief  Executed at each timer interruption (option must be enabled)
- * @param  None
- * @retval None
- */
-void TSL_CallBack_TimerTick(void) {
-}
-
-/**
- * @brief  Executed when a sensor is in Error state
- * @param  None
- * @retval None
- */
-/*void MyLinRots_ErrorStateProcess(void) {
- TSL_linrot_SetStateOff();
- while (1) {
- }
- }*/
 
 /**
  * @brief  Inserts a delay time.
@@ -492,12 +481,14 @@ void DMA_ISR(void) {
 //signal draw
 		uint8_t x = 94, y, xp, yp;
 		xp = x;
-		yp = (uint8_t) (64 * sum_buf[0] / 10) + 32;
+		yp = (uint8_t) (64 * sum_buf[0] / 1) + 32;
+		yp = (yp > 47) ? 47 : yp;
+		yp = (yp < 16) ? 16 : yp;
 		for (uint8_t i = 1; i < 10; i++) {
 			x += 3;
-			y = (uint8_t) (64 * sum_buf[i] / 10) + 32;
-			y = (y > 48) ? 48 : y;
-			y = (y < 15) ? 15 : y;
+			y = (uint8_t) (64 * sum_buf[i] / 1) + 32;
+			y = (y > 47) ? 47 : y;
+			y = (y < 16) ? 16 : y;
 			LCD_line(LINE_TYPE_BLACK, xp, yp, x, y);
 			xp = x;
 			yp = y;
